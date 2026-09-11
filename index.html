@@ -196,6 +196,7 @@
     font-size:11px;font-weight:600;cursor:pointer;color:var(--ink-soft);
   }
   .row-actions button.toggle:hover{border-color:var(--teal);color:var(--teal);}
+  .row-actions button.editar:hover{border-color:var(--gold);color:var(--gold-deep);}
   .row-actions button.del:hover{border-color:var(--danger);color:var(--danger);}
 
   .empty{padding:36px 22px;text-align:center;color:var(--ink-soft);font-size:13px;}
@@ -208,6 +209,16 @@
   }
   #pinOverlay .box{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:22px 24px;width:260px;text-align:center;}
   #pinOverlay .box strong{color:var(--ink);}
+
+  #editOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;
+    justify-content:center;z-index:50;padding:20px;
+  }
+  #editOverlay .box{
+    background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:22px 24px;
+    width:100%;max-width:380px;text-align:left;max-height:88vh;overflow-y:auto;
+  }
+  #editOverlay .box h3{margin:0 0 16px;font-size:15px;color:var(--ink);}
   #pinOverlay input{width:100%;text-align:center;font-size:18px;letter-spacing:4px;padding:8px;border:1px solid var(--line);border-radius:7px;margin:12px 0;background:var(--field-bg);color:var(--field-text);}
   #pinOverlay p{font-size:12.5px;color:var(--ink-soft);margin:0;}
   #pinError{color:var(--danger);font-size:12px;min-height:16px;}
@@ -335,6 +346,48 @@
     <div style="display:flex;gap:8px;">
       <button class="ghost" id="pinCancelar" style="flex:1;">Cancelar</button>
       <button class="primary" id="pinEntrar" style="margin-top:0;flex:1;">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="editOverlay" class="hidden">
+  <div class="box">
+    <h3>Editar pedido</h3>
+    <div class="field full">
+      <label for="e_nombre">Nombre</label>
+      <input type="text" id="e_nombre">
+    </div>
+    <div class="field full">
+      <label for="e_telefono">Celular (WhatsApp)</label>
+      <input type="tel" id="e_telefono">
+    </div>
+    <div class="field full">
+      <label>Entrega</label>
+      <div class="radio-row">
+        <label class="radio-opt" id="e_optRetiro"><input type="radio" name="e_entrega" value="No"> Retiro en local</label>
+        <label class="radio-opt" id="e_optEnvio"><input type="radio" name="e_entrega" value="Si"> Envío</label>
+      </div>
+    </div>
+    <div class="field full" id="e_wrapCiudad">
+      <label for="e_ciudad">Ciudad</label>
+      <select id="e_ciudad"></select>
+    </div>
+    <div class="field full" id="e_wrapZona">
+      <label for="e_zona">Zona</label>
+      <select id="e_zona"></select>
+    </div>
+    <div class="field full" id="e_wrapDireccion">
+      <label for="e_direccion">Referencias</label>
+      <input type="text" id="e_direccion">
+    </div>
+    <div class="field full">
+      <label for="e_notas">Notas</label>
+      <textarea id="e_notas"></textarea>
+    </div>
+    <div id="e_errorMsg" style="color:var(--danger);font-size:12.5px;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="ghost" id="btnCancelarEdit" style="flex:1;">Cancelar</button>
+      <button class="primary" id="btnGuardarEdit" style="margin-top:0;flex:1;">Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -593,6 +646,7 @@ function poblarZonas(selZona, ciudad, placeholder){
 }
 poblarCiudades($("c_ciudad"));
 poblarCiudades($("a_ciudad"));
+poblarCiudades($("e_ciudad"));
 
 /* ================= Mapa (Leaflet + OpenStreetMap, sin API key) ================= */
 if(window.L){ L.Icon.Default.imagePath = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/'; }
@@ -848,6 +902,95 @@ $("btnVolverCliente").addEventListener("click", async ()=>{
   $("vistaAdmin").classList.add("hidden");
   $("vistaCliente").classList.remove("hidden");
   await refrescarEstadoCliente();
+});
+
+/* ================= Editar pedido (panel maestro) ================= */
+let indiceEditando = null;
+
+function setEntregaEdit(esEnvio){
+  $("e_optEnvio").classList.toggle("active", esEnvio);
+  $("e_optRetiro").classList.toggle("active", !esEnvio);
+  $("e_wrapCiudad").style.display = esEnvio ? "flex" : "none";
+  $("e_wrapZona").style.display = esEnvio ? "flex" : "none";
+  $("e_wrapDireccion").style.display = esEnvio ? "flex" : "none";
+}
+document.querySelectorAll('input[name="e_entrega"]').forEach(r=>{
+  r.addEventListener("change", ()=> setEntregaEdit(r.value === "Si"));
+});
+$("e_ciudad").addEventListener("change", ()=>{
+  poblarZonas($("e_zona"), $("e_ciudad").value, "Primero elige ciudad");
+});
+
+function abrirEditarPedido(indice){
+  indiceEditando = indice;
+  const p = pedidos[indice];
+  $("e_errorMsg").textContent = "";
+  $("e_nombre").value = p.nombre || "";
+  $("e_telefono").value = p.telefono || "";
+  $("e_direccion").value = (p.direccion === "Retiro en local" || p.direccion === "Sin referencia") ? "" : (p.direccion || "");
+  $("e_notas").value = p.notas || "";
+
+  const esEnvio = p.envio === "Si";
+  document.querySelector(`input[name="e_entrega"][value="${esEnvio?"Si":"No"}"]`).checked = true;
+  setEntregaEdit(esEnvio);
+
+  if(esEnvio){
+    $("e_ciudad").value = p.ciudad || "";
+    poblarZonas($("e_zona"), p.ciudad || "", "Primero elige ciudad");
+    if(p.zona){ $("e_zona").value = p.zona; }
+  } else {
+    $("e_ciudad").value = "";
+    poblarZonas($("e_zona"), "", "Primero elige ciudad");
+  }
+
+  $("editOverlay").classList.remove("hidden");
+}
+$("btnCancelarEdit").addEventListener("click", ()=>{
+  $("editOverlay").classList.add("hidden");
+  indiceEditando = null;
+});
+$("btnGuardarEdit").addEventListener("click", async ()=>{
+  if(indiceEditando === null) return;
+  const p = pedidos[indiceEditando];
+
+  const nombre = $("e_nombre").value.trim();
+  const telefono = $("e_telefono").value.trim();
+  const esEnvio = document.querySelector('input[name="e_entrega"]:checked').value === "Si";
+  const ciudad = $("e_ciudad").value;
+  const zona = $("e_zona").value;
+  const direccion = $("e_direccion").value.trim();
+  const notas = $("e_notas").value.trim();
+
+  $("e_errorMsg").textContent = "";
+  if(!nombre){ $("e_errorMsg").textContent = "Ingresa el nombre."; return; }
+  if(esEnvio && (!ciudad || !zona)){ $("e_errorMsg").textContent = "Selecciona ciudad y zona."; return; }
+
+  let costoEnvio = 0, tiempoEstimado = "";
+  if(esEnvio){
+    const opt = $("e_zona").selectedOptions[0];
+    costoEnvio = parseFloat(opt.dataset.tarifa);
+    tiempoEstimado = opt.dataset.tiempo;
+  }
+  const subtotalActual = Number(p.subtotal) || 0;
+  const total = subtotalActual + costoEnvio;
+
+  const cambios = {
+    nombre, telefono,
+    envio: esEnvio ? "Si" : "No",
+    ciudad: esEnvio ? ciudad : "",
+    zona: esEnvio ? zona : "",
+    tiempoEstimado,
+    costoEnvio,
+    direccion: esEnvio ? (direccion || "Sin referencia") : "Retiro en local",
+    notas,
+    total
+  };
+
+  Object.assign(p, cambios);
+  await actualizarPedidoRemoto(p.id, cambios);
+  $("editOverlay").classList.add("hidden");
+  indiceEditando = null;
+  renderAdmin();
 });
 
 /* ================= VISTA ADMIN: estado tienda / cupo / apertura ================= */
@@ -1294,6 +1437,7 @@ function renderAdmin(){
         <td>${p.mapsLink ? `<a class="maps-link" href="${escapeHtml(p.mapsLink)}" target="_blank" rel="noopener">Ver mapa ↗</a>` : "—"}</td>
         <td>
           <div class="row-actions">
+            <button class="editar" data-i="${i}">Editar</button>
             <button class="toggle" data-i="${i}">${p.pagado==='Si'?'Marcar pendiente':'Marcar pagado'}</button>
             <button class="del" data-i="${i}">Eliminar</button>
           </div>
@@ -1318,6 +1462,11 @@ function renderAdmin(){
   $("m_totalExtra").textContent = money(totalesCategoria.totalExtra);
   $("m_totalDelivery").textContent = money(totalesCategoria.totalDelivery);
 
+  tbody.querySelectorAll("button.editar").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      abrirEditarPedido(Number(btn.dataset.i));
+    });
+  });
   tbody.querySelectorAll("button.toggle").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
       const i = Number(btn.dataset.i);
