@@ -380,6 +380,13 @@
       <label for="e_direccion">Referencias</label>
       <input type="text" id="e_direccion">
     </div>
+    <div class="field full" id="e_wrapMapa">
+      <label>Ubicación de entrega</label>
+      <div class="map-frame">
+        <div id="mapEditar" style="height:200px;"></div>
+        <p class="map-hint">Arrastra el pin o toca el mapa para ajustar la ubicación.</p>
+      </div>
+    </div>
     <div class="field full">
       <label for="e_notas">Notas</label>
       <textarea id="e_notas"></textarea>
@@ -906,6 +913,19 @@ $("btnVolverCliente").addEventListener("click", async ()=>{
 
 /* ================= Editar pedido (panel maestro) ================= */
 let indiceEditando = null;
+let mapEditObj = null;
+
+function initEditMap(){
+  if(mapEditObj) return;
+  const center = CITY_CENTERS['Guayaquil'];
+  const map = L.map('mapEditar').setView(center, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap'
+  }).addTo(map);
+  const marker = L.marker(center, {draggable:true}).addTo(map);
+  map.on("click", (e)=> marker.setLatLng(e.latlng));
+  mapEditObj = { map, marker };
+}
 
 function setEntregaEdit(esEnvio){
   $("e_optEnvio").classList.toggle("active", esEnvio);
@@ -913,6 +933,8 @@ function setEntregaEdit(esEnvio){
   $("e_wrapCiudad").style.display = esEnvio ? "flex" : "none";
   $("e_wrapZona").style.display = esEnvio ? "flex" : "none";
   $("e_wrapDireccion").style.display = esEnvio ? "flex" : "none";
+  $("e_wrapMapa").style.display = esEnvio ? "flex" : "none";
+  if(esEnvio){ setTimeout(()=> mapEditObj && mapEditObj.map.invalidateSize(), 50); }
 }
 document.querySelectorAll('input[name="e_entrega"]').forEach(r=>{
   r.addEventListener("change", ()=> setEntregaEdit(r.value === "Si"));
@@ -938,6 +960,18 @@ function abrirEditarPedido(indice){
     $("e_ciudad").value = p.ciudad || "";
     poblarZonas($("e_zona"), p.ciudad || "", "Primero elige ciudad");
     if(p.zona){ $("e_zona").value = p.zona; }
+
+    initEditMap();
+    let lat = Number(p.lat), lng = Number(p.lng);
+    if(!lat || !lng){
+      const c = CITY_CENTERS[p.ciudad] || CITY_CENTERS['Guayaquil'];
+      lat = c[0]; lng = c[1];
+    }
+    setTimeout(()=>{
+      mapEditObj.map.invalidateSize();
+      mapEditObj.map.setView([lat,lng], 16);
+      mapEditObj.marker.setLatLng([lat,lng]);
+    }, 60);
   } else {
     $("e_ciudad").value = "";
     poblarZonas($("e_zona"), "", "Primero elige ciudad");
@@ -974,6 +1008,15 @@ $("btnGuardarEdit").addEventListener("click", async ()=>{
   const subtotalActual = Number(p.subtotal) || 0;
   const total = subtotalActual + costoEnvio;
 
+  let lat = p.lat, lng = p.lng, mapsLink = p.mapsLink || "";
+  if(esEnvio && mapEditObj){
+    const ll = mapEditObj.marker.getLatLng();
+    lat = ll.lat; lng = ll.lng;
+    mapsLink = `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lng.toFixed(6)}`;
+  } else if(!esEnvio){
+    lat = null; lng = null; mapsLink = "";
+  }
+
   const cambios = {
     nombre, telefono,
     envio: esEnvio ? "Si" : "No",
@@ -983,6 +1026,7 @@ $("btnGuardarEdit").addEventListener("click", async ()=>{
     costoEnvio,
     direccion: esEnvio ? (direccion || "Sin referencia") : "Retiro en local",
     notas,
+    mapsLink, lat, lng,
     total
   };
 
