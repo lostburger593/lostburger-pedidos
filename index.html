@@ -207,7 +207,7 @@
   .maps-link{color:var(--gold);font-weight:700;text-decoration:none;}
   .maps-link:hover{text-decoration:underline;}
 
-  .row-actions{display:flex;gap:6px;}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap;}
   .row-actions button{
     border:1px solid var(--line);background:var(--field-bg);border-radius:6px;padding:5px 9px;
     font-size:11px;font-weight:600;cursor:pointer;color:var(--ink-soft);
@@ -468,6 +468,20 @@
     </div>
   </div>
 
+  <div class="card" id="mensajeCard" style="margin-bottom:18px;padding:0;">
+    <h2>Mensaje de confirmación de pago</h2>
+    <div style="padding:18px 22px;">
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;">
+        Este es el mensaje que se copia con el botón "Copiar mensaje" de cada pedido.
+        Puedes usar <strong>{nombre}</strong>, <strong>{detalle}</strong> y <strong>{monto}</strong> —
+        se reemplazan solos con los datos de cada pedido.
+      </p>
+      <textarea id="s_plantillaMensaje" style="width:100%;min-height:160px;border:1px solid var(--line);border-radius:7px;padding:10px;font-size:13px;background:var(--field-bg);color:var(--field-text);font-family:inherit;resize:vertical;"></textarea>
+      <button class="ghost" id="btnGuardarPlantilla" style="margin-top:10px;">Guardar plantilla</button>
+      <span id="plantillaGuardadaTexto" style="font-size:12.5px;color:var(--ink-soft);margin-left:10px;"></span>
+    </div>
+  </div>
+
   <div class="card" id="productosCard" style="margin-bottom:18px;padding:0;">
     <h2>Combos</h2>
     <div style="padding:18px 22px;">
@@ -700,12 +714,23 @@ const CITY_CENTERS = {
 const PIN_INTERNO = "2026";
 const CUPO_DEFAULT = 100;
 const PRODUCTOS_DEFAULT = [{ nombre: "Combo Lost (hamburguesa + papas + cola)", precio: 5.99 }];
+const PLANTILLA_MENSAJE_DEFAULT = `Holaa 🍔 este es un mensaje para confirmar tu pedido de {detalle}, por un total de \${monto}.
+
+Para hacerlo oficial solo necesitamos tu comprobante de pago y ¡listo! 🙌
+
+Puedes transferir a:
+Banco Internacional - Cuenta de Ahorros
+Número: 1408033535
+Nombre: LUIGGY MENDOZA
+Identificación: 0950620112
+
+Apenas tengamos tu comprobante, ¡tu pedido queda asegurado para la próxima apertura! 🚀`;
 
 /* ⚠️ PEGA AQUÍ TU URL DE APPS SCRIPT (termina en /exec) — ver instrucciones */
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr4hWzm9NeHIs6h56cn2nkpkbC0KVrNnkgI_uTaksQP74EtYNsOu70mn3aJB7PMVum/exec";
 
 let pedidos = [];
-let cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null };
+let cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null, plantillaMensaje: PLANTILLA_MENSAJE_DEFAULT };
 let PRODUCTOS = PRODUCTOS_DEFAULT.slice();
 let mapClientObj = null;
 let enviandoPedido = false;
@@ -1033,6 +1058,43 @@ function renderUbicacionLocalTexto(){
     ? "Ubicación guardada ✓"
     : "Aún no has guardado la ubicación de tu local.";
 }
+
+/* ================= Plantilla del mensaje de confirmación ================= */
+function renderPlantillaMensaje(){
+  $("s_plantillaMensaje").value = cupoConfig.plantillaMensaje || PLANTILLA_MENSAJE_DEFAULT;
+}
+$("btnGuardarPlantilla").addEventListener("click", async ()=>{
+  const texto = $("s_plantillaMensaje").value;
+  cupoConfig.plantillaMensaje = texto;
+  await guardarPlantillaMensajeRemoto(texto);
+  $("plantillaGuardadaTexto").textContent = "Guardada ✓";
+  setTimeout(()=> $("plantillaGuardadaTexto").textContent = "", 2500);
+});
+function copiarMensajeConfirmacion(indice){
+  const p = pedidos[indice];
+  const monto = (Number(p.total)||0).toFixed(2);
+  const plantilla = cupoConfig.plantillaMensaje || PLANTILLA_MENSAJE_DEFAULT;
+  const mensaje = plantilla
+    .split("{nombre}").join(p.nombre || "")
+    .split("{detalle}").join(p.detalle || "")
+    .split("{monto}").join(monto);
+
+  const marcarCopiado = (btn)=>{
+    const textoOriginal = btn.textContent;
+    btn.textContent = "¡Copiado! ✓";
+    setTimeout(()=> btn.textContent = textoOriginal, 1800);
+  };
+  const btn = document.querySelector(`button.copiar-mensaje[data-i="${indice}"]`);
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(mensaje)
+      .then(()=> btn && marcarCopiado(btn))
+      .catch(()=> alert("No se pudo copiar automáticamente. Aquí está el mensaje:\n\n" + mensaje));
+  } else {
+    alert("Copia este mensaje manualmente:\n\n" + mensaje);
+  }
+}
+
 $("btnGuardarUbicacionLocal").addEventListener("click", async ()=>{
   if(!mapLocalObj) return;
   const ll = mapLocalObj.marker.getLatLng();
@@ -1530,7 +1592,7 @@ function storageDisponible(){
 async function loadData(){
   if(!storageDisponible()){
     pedidos = [];
-    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null };
+    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null, plantillaMensaje: PLANTILLA_MENSAJE_DEFAULT };
     PRODUCTOS = PRODUCTOS_DEFAULT.slice();
     return;
   }
@@ -1546,7 +1608,8 @@ async function loadData(){
     const cerrado = data.cerrado === "Si" ? "Si" : "No";
     const latLocal = data.latLocal ? Number(data.latLocal) : null;
     const lngLocal = data.lngLocal ? Number(data.lngLocal) : null;
-    cupoConfig = { cupo, usados, apertura, proximoBatch, cerrado, latLocal, lngLocal };
+    const plantillaMensaje = data.plantillaMensaje || PLANTILLA_MENSAJE_DEFAULT;
+    cupoConfig = { cupo, usados, apertura, proximoBatch, cerrado, latLocal, lngLocal, plantillaMensaje };
     PRODUCTOS = (data.productos && data.productos.length) ? data.productos : PRODUCTOS_DEFAULT.slice();
 
     if(data.zonas && data.zonas.length){
@@ -1562,7 +1625,7 @@ async function loadData(){
   }catch(e){
     console.error("Error al cargar datos:", e);
     pedidos = [];
-    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null };
+    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null, plantillaMensaje: PLANTILLA_MENSAJE_DEFAULT };
     PRODUCTOS = PRODUCTOS_DEFAULT.slice();
   }
 }
@@ -1591,6 +1654,7 @@ function reiniciarAperturaRemoto(fecha){ return postRemoto({ accion:"apertura", 
 function guardarProximoBatchRemoto(texto){ return postRemoto({ accion:"proximo_batch", texto }); }
 function guardarCerradoRemoto(cerrado){ return postRemoto({ accion:"cerrado", cerrado }); }
 function guardarUbicacionLocalRemoto(lat, lng){ return postRemoto({ accion:"ubicacion_local", lat, lng }); }
+function guardarPlantillaMensajeRemoto(texto){ return postRemoto({ accion:"plantilla_mensaje", texto }); }
 function agregarProductoRemoto(nombre, precio, categoria){ return postRemoto({ accion:"producto_nuevo", nombre, precio, categoria }); }
 function actualizarProductoRemoto(nombre, precio){ return postRemoto({ accion:"producto_actualizar", nombre, precio }); }
 function eliminarProductoRemoto(nombre){ return postRemoto({ accion:"producto_eliminar", nombre }); }
@@ -1613,6 +1677,7 @@ async function loadPedidosAdmin(){
   initLocalMap();
   renderUbicacionLocalTexto();
   renderListaZonas($("buscarZona").value);
+  renderPlantillaMensaje();
   $("loadingNote").classList.add("hidden");
 }
 
@@ -1633,6 +1698,7 @@ $("btnActualizar").addEventListener("click", async ()=>{
     renderListaProductos();
     renderUbicacionLocalTexto();
     renderListaZonas($("buscarZona").value);
+    renderPlantillaMensaje();
   } finally {
     btn.disabled = false;
     btn.textContent = textoOriginal;
@@ -1937,6 +2003,7 @@ function renderAdmin(){
         <td>
           <div class="row-actions">
             <button class="editar" data-i="${i}">Editar</button>
+            <button class="copiar-mensaje" data-i="${i}">Copiar mensaje</button>
             <button class="toggle" data-i="${i}">${p.pagado==='Si'?'Marcar pendiente':'Marcar pagado'}</button>
             <button class="del" data-i="${i}">Eliminar</button>
           </div>
@@ -1964,6 +2031,11 @@ function renderAdmin(){
   tbody.querySelectorAll("button.editar").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       abrirEditarPedido(Number(btn.dataset.i));
+    });
+  });
+  tbody.querySelectorAll("button.copiar-mensaje").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      copiarMensajeConfirmacion(Number(btn.dataset.i));
     });
   });
   tbody.querySelectorAll("button.toggle").forEach(btn=>{
