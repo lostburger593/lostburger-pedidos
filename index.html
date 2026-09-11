@@ -916,7 +916,10 @@ let indiceEditando = null;
 let mapEditObj = null;
 
 function initEditMap(){
-  if(mapEditObj) return;
+  if(mapEditObj){
+    mapEditObj.map.remove();
+    mapEditObj = null;
+  }
   const center = CITY_CENTERS['Guayaquil'];
   const map = L.map('mapEditar').setView(center, 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -935,22 +938,18 @@ function setEntregaEdit(esEnvio){
   $("e_wrapDireccion").style.display = esEnvio ? "flex" : "none";
   $("e_wrapMapa").style.display = esEnvio ? "flex" : "none";
   if(esEnvio){
-    initEditMap();
     setTimeout(()=>{
-      mapEditObj.map.invalidateSize();
-      if(!mapEditObj.posicionado){
-        const p = (indiceEditando !== null) ? pedidos[indiceEditando] : null;
-        let lat = p ? Number(p.lat) : NaN, lng = p ? Number(p.lng) : NaN;
-        if(!lat || !lng){
-          const ciudadSel = $("e_ciudad").value;
-          const c = CITY_CENTERS[ciudadSel] || CITY_CENTERS['Guayaquil'];
-          lat = c[0]; lng = c[1];
-        }
-        mapEditObj.map.setView([lat,lng], 16);
-        mapEditObj.marker.setLatLng([lat,lng]);
-        mapEditObj.posicionado = true;
+      initEditMap();
+      const p = (indiceEditando !== null) ? pedidos[indiceEditando] : null;
+      let lat = p ? Number(p.lat) : NaN, lng = p ? Number(p.lng) : NaN;
+      if(!lat || !lng){
+        const ciudadSel = $("e_ciudad").value;
+        const c = CITY_CENTERS[ciudadSel] || CITY_CENTERS['Guayaquil'];
+        lat = c[0]; lng = c[1];
       }
-    }, 60);
+      mapEditObj.map.setView([lat,lng], 16);
+      mapEditObj.marker.setLatLng([lat,lng]);
+    }, 100);
   }
 }
 document.querySelectorAll('input[name="e_entrega"]').forEach(r=>{
