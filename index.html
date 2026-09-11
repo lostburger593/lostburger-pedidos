@@ -633,6 +633,11 @@
     <button class="primary" id="btnIngresarAdmin" style="max-width:220px;">Ingresar</button>
   </div>
 
+  <div class="card" id="cantidadesCard" style="margin-bottom:18px;padding:0;">
+    <h2>Cantidades vendidas por producto</h2>
+    <div style="padding:18px 22px;" id="listaCantidadesProductos"></div>
+  </div>
+
   <div class="metrics">
     <div class="metric"><div class="label">Pedidos registrados</div><div class="value" id="m_total">0</div></div>
     <div class="metric"><div class="label">Total facturado</div><div class="value" id="m_facturado">$0.00</div></div>
@@ -1940,6 +1945,41 @@ function enlaceMapaPedido(p){
   return `<a class="maps-link" href="${escapeHtml(p.mapsLink)}" target="_blank" rel="noopener">Ver mapa ↗</a>`;
 }
 
+function calcularCantidadesPorProducto(){
+  const cantidades = {};
+  PRODUCTOS.forEach(p => cantidades[p.nombre] = 0);
+
+  pedidos.forEach(p=>{
+    let items = [];
+    if(p.items){
+      try{ items = JSON.parse(p.items); }catch(e){ items = []; }
+    }
+    if(items.length){
+      items.forEach(it=>{
+        cantidades[it.nombre] = (cantidades[it.nombre] || 0) + (Number(it.cantidad)||0);
+      });
+    } else if(p.detalle){
+      cantidades[p.detalle] = (cantidades[p.detalle] || 0) + (Number(p.cantidad)||0);
+    }
+  });
+  return cantidades;
+}
+function renderCantidadesPorProducto(){
+  const cantidades = calcularCantidadesPorProducto();
+  const cont = $("listaCantidadesProductos");
+  const nombres = Object.keys(cantidades);
+  if(!nombres.length){
+    cont.innerHTML = `<p style="color:var(--ink-soft);font-size:13px;margin:0;">Aún no hay productos en el catálogo.</p>`;
+    return;
+  }
+  cont.innerHTML = nombres.map(nombre => `
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink);">
+      <span>${escapeHtml(nombre)}</span>
+      <strong>${cantidades[nombre]}</strong>
+    </div>
+  `).join("");
+}
+
 function calcularTotalesPorCategoria(){
   let totalCombo = 0, totalExtra = 0, totalDelivery = 0;
   pedidos.forEach(p=>{
@@ -2027,6 +2067,7 @@ function renderAdmin(){
   $("m_totalCombo").textContent = money(totalesCategoria.totalCombo);
   $("m_totalExtra").textContent = money(totalesCategoria.totalExtra);
   $("m_totalDelivery").textContent = money(totalesCategoria.totalDelivery);
+  renderCantidadesPorProducto();
 
   tbody.querySelectorAll("button.editar").forEach(btn=>{
     btn.addEventListener("click", ()=>{
