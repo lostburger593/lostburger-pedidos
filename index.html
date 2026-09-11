@@ -934,13 +934,35 @@ function setEntregaEdit(esEnvio){
   $("e_wrapZona").style.display = esEnvio ? "flex" : "none";
   $("e_wrapDireccion").style.display = esEnvio ? "flex" : "none";
   $("e_wrapMapa").style.display = esEnvio ? "flex" : "none";
-  if(esEnvio){ setTimeout(()=> mapEditObj && mapEditObj.map.invalidateSize(), 50); }
+  if(esEnvio){
+    initEditMap();
+    setTimeout(()=>{
+      mapEditObj.map.invalidateSize();
+      if(!mapEditObj.posicionado){
+        const p = (indiceEditando !== null) ? pedidos[indiceEditando] : null;
+        let lat = p ? Number(p.lat) : NaN, lng = p ? Number(p.lng) : NaN;
+        if(!lat || !lng){
+          const ciudadSel = $("e_ciudad").value;
+          const c = CITY_CENTERS[ciudadSel] || CITY_CENTERS['Guayaquil'];
+          lat = c[0]; lng = c[1];
+        }
+        mapEditObj.map.setView([lat,lng], 16);
+        mapEditObj.marker.setLatLng([lat,lng]);
+        mapEditObj.posicionado = true;
+      }
+    }, 60);
+  }
 }
 document.querySelectorAll('input[name="e_entrega"]').forEach(r=>{
   r.addEventListener("change", ()=> setEntregaEdit(r.value === "Si"));
 });
 $("e_ciudad").addEventListener("change", ()=>{
   poblarZonas($("e_zona"), $("e_ciudad").value, "Primero elige ciudad");
+  const ciudadSel = $("e_ciudad").value;
+  if(ciudadSel && CITY_CENTERS[ciudadSel] && mapEditObj){
+    mapEditObj.map.setView(CITY_CENTERS[ciudadSel], 13);
+    mapEditObj.marker.setLatLng(CITY_CENTERS[ciudadSel]);
+  }
 });
 
 function abrirEditarPedido(indice){
@@ -951,32 +973,21 @@ function abrirEditarPedido(indice){
   $("e_telefono").value = p.telefono || "";
   $("e_direccion").value = (p.direccion === "Retiro en local" || p.direccion === "Sin referencia") ? "" : (p.direccion || "");
   $("e_notas").value = p.notas || "";
+  if(mapEditObj){ mapEditObj.posicionado = false; }
 
   const esEnvio = p.envio === "Si";
   document.querySelector(`input[name="e_entrega"][value="${esEnvio?"Si":"No"}"]`).checked = true;
-  setEntregaEdit(esEnvio);
 
   if(esEnvio){
     $("e_ciudad").value = p.ciudad || "";
     poblarZonas($("e_zona"), p.ciudad || "", "Primero elige ciudad");
     if(p.zona){ $("e_zona").value = p.zona; }
-
-    initEditMap();
-    let lat = Number(p.lat), lng = Number(p.lng);
-    if(!lat || !lng){
-      const c = CITY_CENTERS[p.ciudad] || CITY_CENTERS['Guayaquil'];
-      lat = c[0]; lng = c[1];
-    }
-    setTimeout(()=>{
-      mapEditObj.map.invalidateSize();
-      mapEditObj.map.setView([lat,lng], 16);
-      mapEditObj.marker.setLatLng([lat,lng]);
-    }, 60);
   } else {
     $("e_ciudad").value = "";
     poblarZonas($("e_zona"), "", "Primero elige ciudad");
   }
 
+  setEntregaEdit(esEnvio);
   $("editOverlay").classList.remove("hidden");
 }
 $("btnCancelarEdit").addEventListener("click", ()=>{
