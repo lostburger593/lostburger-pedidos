@@ -671,15 +671,15 @@ function initClientMap(){
   map.on("click", (e)=>{ marker.setLatLng(e.latlng); marcarListo(); });
 }
 
-async function geocodeAndCenter(query){
+async function geocodeAndCenter(query, mapObj){
   try{
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ec&q=${encodeURIComponent(query)}`;
     const res = await fetch(url);
     const data = await res.json();
     if(data && data[0]){
       const lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
-      mapClientObj.map.setView([lat,lon], 17);
-      mapClientObj.marker.setLatLng([lat,lon]);
+      mapObj.map.setView([lat,lon], 17);
+      mapObj.marker.setLatLng([lat,lon]);
       return true;
     }
   }catch(e){ console.error('Error de geocodificación:', e); }
@@ -693,7 +693,7 @@ $("c_zona").addEventListener("change", async ()=>{
     info.textContent = `Costo de envío: ${money(opt.dataset.tarifa)} — tiempo estimado: ${opt.dataset.tiempo}`;
     info.classList.add("show");
     const ciudad = $("c_ciudad").value, zona = opt.value;
-    const ok = await geocodeAndCenter(`${zona}, ${ciudad}, Ecuador`);
+    const ok = await geocodeAndCenter(`${zona}, ${ciudad}, Ecuador`, mapClientObj);
     if(!ok && CITY_CENTERS[ciudad]){
       mapClientObj.map.setView(CITY_CENTERS[ciudad], 13);
       mapClientObj.marker.setLatLng(CITY_CENTERS[ciudad]);
@@ -961,6 +961,17 @@ $("e_ciudad").addEventListener("change", ()=>{
   if(ciudadSel && CITY_CENTERS[ciudadSel] && mapEditObj){
     mapEditObj.map.setView(CITY_CENTERS[ciudadSel], 13);
     mapEditObj.marker.setLatLng(CITY_CENTERS[ciudadSel]);
+  }
+});
+$("e_zona").addEventListener("change", async ()=>{
+  const opt = $("e_zona").selectedOptions[0];
+  if(opt && opt.dataset.tarifa && mapEditObj){
+    const ciudad = $("e_ciudad").value, zona = opt.value;
+    const ok = await geocodeAndCenter(`${zona}, ${ciudad}, Ecuador`, mapEditObj);
+    if(!ok && CITY_CENTERS[ciudad]){
+      mapEditObj.map.setView(CITY_CENTERS[ciudad], 13);
+      mapEditObj.marker.setLatLng(CITY_CENTERS[ciudad]);
+    }
   }
 });
 
