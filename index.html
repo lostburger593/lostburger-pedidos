@@ -102,6 +102,23 @@
   .carrito-subtotal{text-align:right;font-weight:700;font-size:14px;color:var(--ink);margin-top:8px;}
   .carrito-subtotal.hidden{display:none;}
 
+  .ruta-item{
+    display:flex;align-items:center;gap:10px;background:var(--field-bg);border:1px solid var(--line);
+    border-radius:7px;padding:8px 10px;font-size:13px;color:var(--field-text);cursor:pointer;
+  }
+  .ruta-item input{width:auto;}
+  .ruta-parada{
+    display:flex;align-items:flex-start;gap:10px;background:var(--field-bg);border:1px solid var(--line);
+    border-radius:7px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:var(--field-text);
+  }
+  .ruta-parada .num{
+    background:var(--gold);color:#1A1408;font-weight:800;border-radius:50%;
+    width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+    font-size:12px;flex-shrink:0;
+  }
+  .ruta-parada .detalle-parada{flex:1;}
+  .ruta-parada .tiempo-tramo{color:var(--ink-soft);font-size:12px;white-space:nowrap;}
+
   .zona-info{
     grid-column:1/-1;background:var(--teal-bg);border:1px solid rgba(79,169,138,.35);border-radius:8px;
     padding:10px 14px;font-size:13px;color:var(--teal);font-weight:600;display:none;
@@ -439,6 +456,18 @@
     </div>
   </div>
 
+  <div class="card" id="localCard" style="margin-bottom:18px;padding:0;">
+    <h2>Ubicación de tu local</h2>
+    <div style="padding:18px 22px;">
+      <div class="map-frame">
+        <div id="mapLocal" style="height:220px;"></div>
+        <p class="map-hint">Arrastra el pin o toca el mapa hasta la ubicación exacta de tu local.</p>
+      </div>
+      <button class="ghost" id="btnGuardarUbicacionLocal" style="margin-top:10px;">Guardar ubicación</button>
+      <span id="ubicacionLocalTexto" style="font-size:12.5px;color:var(--ink-soft);margin-left:10px;"></span>
+    </div>
+  </div>
+
   <div class="card" id="productosCard" style="margin-bottom:18px;padding:0;">
     <h2>Combos</h2>
     <div style="padding:18px 22px;">
@@ -486,6 +515,41 @@
         <div class="label">Delivery</div>
         <div class="value" id="m_totalDelivery">$0.00</div>
       </div>
+    </div>
+  </div>
+
+  <div class="card" id="zonasCard" style="margin-bottom:18px;padding:0;">
+    <h2>Zonas de entrega y tarifas</h2>
+    <div style="padding:18px 22px;">
+      <input type="text" id="buscarZona" placeholder="Buscar zona… (ej: celeste, sauces, samborondón)" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:9px 10px;font-size:13.5px;background:var(--field-bg);color:var(--field-text);margin-bottom:14px;">
+      <div id="listaZonas" style="max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;"></div>
+
+      <hr style="border:none;border-top:1px solid var(--line);margin:20px 0;">
+
+      <p style="font-size:13px;font-weight:700;color:var(--ink);margin:0 0 12px;">Agregar zona nueva</p>
+      <div class="grid admin" style="align-items:end;">
+        <div class="field">
+          <label for="nz_ciudad">Ciudad</label>
+          <select id="nz_ciudad">
+            <option value="Guayaquil">Guayaquil</option>
+            <option value="Durán">Durán</option>
+            <option value="Samborondón">Samborondón</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="nz_nombre">Nombre de la zona</label>
+          <input type="text" id="nz_nombre" placeholder="Ej: Ciudad Celeste Etapa 1">
+        </div>
+        <div class="field">
+          <label for="nz_tarifa">Tarifa ($)</label>
+          <input type="number" id="nz_tarifa" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label for="nz_tiempo">Tiempo estimado</label>
+          <input type="text" id="nz_tiempo" placeholder="Ej: 20-30 min">
+        </div>
+      </div>
+      <button class="ghost" id="btnAgregarZona" style="margin-top:10px;">Agregar zona</button>
     </div>
   </div>
 
@@ -562,6 +626,32 @@
     <div class="metric pend"><div class="label">Pendiente de cobro</div><div class="value" id="m_pendiente">$0.00</div></div>
   </div>
 
+  <div class="card" id="rutaCard" style="margin-bottom:18px;padding:0;">
+    <h2>Hoja de ruta (varios pedidos a la vez)</h2>
+    <div style="padding:18px 22px;">
+      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;font-weight:700;">Manual: tú eliges cuáles</p>
+      <div id="listaPedidosRuta" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+      <button class="primary" id="btnOptimizarRuta" style="margin-top:0;">Optimizar ruta</button>
+      <div id="resultadoRuta"></div>
+
+      <hr style="border:none;border-top:1px solid var(--line);margin:22px 0;">
+
+      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;font-weight:700;">Automático: el sistema arma las rutas por ti</p>
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 12px;">
+        Agrupa TODOS los pedidos pendientes con envío por cercanía real, en tandas de máximo
+        el tamaño que elijas, para que ningún repartidor cargue más de la cuenta.
+      </p>
+      <div class="settings-row" style="margin-bottom:12px;">
+        <div class="settings-field">
+          <label for="s_maxporruta">Máximo de paradas por ruta</label>
+          <input type="number" id="s_maxporruta" min="1" step="1" value="5">
+        </div>
+        <button class="primary" id="btnSugerirRutas" style="margin-top:0;">Sugerir rutas automáticas</button>
+      </div>
+      <div id="resultadoRutasAuto"></div>
+    </div>
+  </div>
+
   <div class="card" id="tableCard">
     <h2 style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <span>Pedidos</span>
@@ -599,7 +689,9 @@
 
 <script>
 /* ================= Datos de zonas (Tarifario Maestro LostBurger 2026) ================= */
-const ZONAS = {"Guayaquil": [{"zona": "Samanes 1", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 2", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 3", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 4", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 5", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 6", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 7", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 1", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 2", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 3", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 4", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 5", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 6", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 7", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 8", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 9", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Acuarela del Río", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Bosques del Salado", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Valle de los Geranios", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Ciudad del Río Norte", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Alborada I", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada II", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada III", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada IV", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada V", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada VI", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada VII", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada VIII", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada IX", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada X", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Garzota 1", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Garzota 2", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Garzota 3", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Garzota 4", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 1", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 2", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 3", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 4", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 5", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Martha de Roldós", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Los Vergeles", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Huancavilca Norte", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Brisas del Río", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Mucho Lote 1", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 1", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 2", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 3", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 4", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 5", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Juan Montalvo", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Mucho Lote 2", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Orquídeas 1", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Orquídeas 2", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Orquídeas 3", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Orquídeas 4", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Urdenor 1", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Urdenor 2", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Kennedy Norte", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Kennedy Nueva", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Kennedy Vieja", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Atarazana", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Ciudad Colón", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Bellavista", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Las Cumbres", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Urdesa Norte", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Lomas de Urdesa", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Mapasingue Este", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Mapasingue Oeste", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "FAE", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "ADACE", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Jardines del Salado", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "La Herradura", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Colinas de la Alborada", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Simón Bolívar", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Los Álamos", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Herradura del Salado", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Centro de Guayaquil", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Puerto Santa Ana", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Malecón", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Cerro Santa Ana", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Los Ceibos", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Colinas de los Ceibos", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Santa Cecilia", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Olivos 1", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Olivos 2", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Centenario", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Barrio Centenario", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Kennedy Sur", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Las Acacias", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "La Saiba", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Floresta 1", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Floresta 2", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Floresta 3", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Pradera 1", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Pradera 2", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Pradera 3", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Los Esteros", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Coviem", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Valdivia", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Fertisa", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Santa Mónica", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Guangala", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Las Tejas", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "La Fragata", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Domingo Comín", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Clínica San Francisco", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "UPS Salesiana", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Mall del Sur", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "La Rioja 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "La Rioja 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "La Rioja 3", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Milán 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Milán 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Málaga 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Málaga 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Toscana 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Toscana 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Nápoli 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Nápoli 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Villa del Rey", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Ciudad Santiago", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Ciudad Olimpo", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Portal al Sol", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Portal al Río", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Porto Vita", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Laguna Club", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Costalmar", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Belo Horizonte", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Villa Geranio", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Villa del Bosque", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Terranostra", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Ocean Club", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Rinconada del Lago", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Puerto Hondo", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 10", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 11", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 12", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 13", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 14", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Colegio Logos", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Bosques de la Costa", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Arcolia", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Vista al Sol", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Vía a la Costa Km 15", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Vía a la Costa Km 16", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Vía a la Costa Km 17", "tarifa": 4.5, "tiempo": "50-65 min"}], "Durán": [{"zona": "Abel Gilbert", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "El Recreo", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Primavera 1", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Primavera 2", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Primavera 3", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Ferroviaria", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Arbolada", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Brisas de Procarsa", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Centro de Durán", "tarifa": 3.0, "tiempo": "30-45 min"}], "Samborondón": [{"zona": "Entre Ríos", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Camino Real", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Vista Sol", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Torres del Sol", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Laguna", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Rincón del Río", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Isla Sol", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Isla Mocolí", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Río Grande", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Castilla", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Estancias del Río", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Plaza Lagos", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Aires del Batán", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "El Dorado", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Nueva", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Blue Bay", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Brisa", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Costa", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Ría", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Marina", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Península", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Zafiro", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Esmeralda", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Rubí", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Coral", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Diamante", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Topacio", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Ámbar", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Platino", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Aura", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Luna", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Natura", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Boreal", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Estelar", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Jardín", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Cosmos", "tarifa": 3.5, "tiempo": "35-50 min"}]};
+const ZONAS_DEFAULT = {"Guayaquil": [{"zona": "Samanes 1", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 2", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 3", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 4", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 5", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 6", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Samanes 7", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 1", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 2", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 3", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 4", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 5", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 6", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 7", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 8", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Sauces 9", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Acuarela del Río", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Bosques del Salado", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Valle de los Geranios", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Ciudad del Río Norte", "tarifa": 1.5, "tiempo": "10-15 min"}, {"zona": "Alborada I", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada II", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada III", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada IV", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada V", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada VI", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada VII", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada VIII", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada IX", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Alborada X", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Garzota 1", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Garzota 2", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Garzota 3", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Garzota 4", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 1", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 2", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 3", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 4", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Guayacanes 5", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Martha de Roldós", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Los Vergeles", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Huancavilca Norte", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Brisas del Río", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Mucho Lote 1", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 1", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 2", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 3", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 4", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Villa España 5", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Juan Montalvo", "tarifa": 2.0, "tiempo": "15-25 min"}, {"zona": "Mucho Lote 2", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Orquídeas 1", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Orquídeas 2", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Orquídeas 3", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Orquídeas 4", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Urdenor 1", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Urdenor 2", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Kennedy Norte", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Kennedy Nueva", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Kennedy Vieja", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Atarazana", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Ciudad Colón", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Bellavista", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Las Cumbres", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Urdesa Norte", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Lomas de Urdesa", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Mapasingue Este", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Mapasingue Oeste", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "FAE", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "ADACE", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Jardines del Salado", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "La Herradura", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Colinas de la Alborada", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Simón Bolívar", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Los Álamos", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Herradura del Salado", "tarifa": 2.5, "tiempo": "20-35 min"}, {"zona": "Centro de Guayaquil", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Puerto Santa Ana", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Malecón", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Cerro Santa Ana", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Los Ceibos", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Colinas de los Ceibos", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Santa Cecilia", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Olivos 1", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Olivos 2", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Centenario", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Barrio Centenario", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Kennedy Sur", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Las Acacias", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "La Saiba", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Floresta 1", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Floresta 2", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Floresta 3", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Pradera 1", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Pradera 2", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Pradera 3", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Los Esteros", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Coviem", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Valdivia", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Fertisa", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Santa Mónica", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Guangala", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Las Tejas", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "La Fragata", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Domingo Comín", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Clínica San Francisco", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "UPS Salesiana", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Mall del Sur", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "La Rioja 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "La Rioja 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "La Rioja 3", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Milán 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Milán 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Málaga 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Málaga 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Toscana 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Toscana 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Nápoli 1", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Nápoli 2", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Villa del Rey", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Ciudad Santiago", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Ciudad Olimpo", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Portal al Sol", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Portal al Río", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Porto Vita", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Laguna Club", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Costalmar", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Belo Horizonte", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Villa Geranio", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Villa del Bosque", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Terranostra", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Ocean Club", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Rinconada del Lago", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Puerto Hondo", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 10", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 11", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 12", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 13", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Vía a la Costa Km 14", "tarifa": 4.0, "tiempo": "45-60 min"}, {"zona": "Colegio Logos", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Bosques de la Costa", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Arcolia", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Vista al Sol", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Vía a la Costa Km 15", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Vía a la Costa Km 16", "tarifa": 4.5, "tiempo": "50-65 min"}, {"zona": "Vía a la Costa Km 17", "tarifa": 4.5, "tiempo": "50-65 min"}], "Durán": [{"zona": "Abel Gilbert", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "El Recreo", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Primavera 1", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Primavera 2", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Primavera 3", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Ferroviaria", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Arbolada", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Brisas de Procarsa", "tarifa": 3.0, "tiempo": "30-45 min"}, {"zona": "Centro de Durán", "tarifa": 3.0, "tiempo": "30-45 min"}], "Samborondón": [{"zona": "Entre Ríos", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Camino Real", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Vista Sol", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Torres del Sol", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Laguna", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Rincón del Río", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Isla Sol", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Isla Mocolí", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Río Grande", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Castilla", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Estancias del Río", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Plaza Lagos", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Aires del Batán", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "El Dorado", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Nueva", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Blue Bay", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Brisa", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Costa", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Ría", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Marina", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Península", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Zafiro", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Esmeralda", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Rubí", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Coral", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Diamante", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Topacio", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Ámbar", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "La Joya Platino", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Aura", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Luna", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Natura", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Boreal", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Estelar", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Jardín", "tarifa": 3.5, "tiempo": "35-50 min"}, {"zona": "Villa Club Cosmos", "tarifa": 3.5, "tiempo": "35-50 min"}]};
+let ZONAS = JSON.parse(JSON.stringify(ZONAS_DEFAULT));
+
 const CITY_CENTERS = {
   'Guayaquil': [-2.170998, -79.922359],
   'Durán': [-2.176, -79.833],
@@ -613,7 +705,7 @@ const PRODUCTOS_DEFAULT = [{ nombre: "Combo Lost (hamburguesa + papas + cola)", 
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr4hWzm9NeHIs6h56cn2nkpkbC0KVrNnkgI_uTaksQP74EtYNsOu70mn3aJB7PMVum/exec";
 
 let pedidos = [];
-let cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No" };
+let cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null };
 let PRODUCTOS = PRODUCTOS_DEFAULT.slice();
 let mapClientObj = null;
 let enviandoPedido = false;
@@ -632,10 +724,13 @@ function waLink(numero){
 
 /* ---------------- Poblar selects de ciudad/zona ---------------- */
 function poblarCiudades(selCiudad){
+  const valorPrevio = selCiudad.value;
+  selCiudad.innerHTML = selCiudad.id === "c_ciudad" ? `<option value="">Selecciona…</option>` : `<option value="">—</option>`;
   Object.keys(ZONAS).forEach(c=>{
     const opt=document.createElement("option"); opt.value=c; opt.textContent=c;
     selCiudad.appendChild(opt);
   });
+  if(Object.keys(ZONAS).includes(valorPrevio)) selCiudad.value = valorPrevio;
 }
 function poblarZonas(selZona, ciudad, placeholder){
   selZona.innerHTML = "";
@@ -852,6 +947,7 @@ function mostrarCerrado(titulo, texto){
 
 async function refrescarEstadoCliente(){
   await loadData();
+  poblarCiudades($("c_ciudad"));
   poblarProductosCliente();
   renderCarritoCliente();
   $("loadingNoteCliente").classList.add("hidden");
@@ -914,6 +1010,37 @@ $("btnVolverCliente").addEventListener("click", async ()=>{
 /* ================= Editar pedido (panel maestro) ================= */
 let indiceEditando = null;
 let mapEditObj = null;
+
+/* ================= Ubicación del local (panel maestro) ================= */
+let mapLocalObj = null;
+function initLocalMap(){
+  if(mapLocalObj) return;
+  const centroInicial = (cupoConfig.latLocal && cupoConfig.lngLocal)
+    ? [cupoConfig.latLocal, cupoConfig.lngLocal]
+    : CITY_CENTERS['Guayaquil'];
+  const map = L.map('mapLocal').setView(centroInicial, 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap'
+  }).addTo(map);
+  const marker = L.marker(centroInicial, {draggable:true}).addTo(map);
+  map.on("click", (e)=> marker.setLatLng(e.latlng));
+  mapLocalObj = { map, marker };
+  setTimeout(()=> map.invalidateSize(), 100);
+  renderUbicacionLocalTexto();
+}
+function renderUbicacionLocalTexto(){
+  $("ubicacionLocalTexto").textContent = (cupoConfig.latLocal && cupoConfig.lngLocal)
+    ? "Ubicación guardada ✓"
+    : "Aún no has guardado la ubicación de tu local.";
+}
+$("btnGuardarUbicacionLocal").addEventListener("click", async ()=>{
+  if(!mapLocalObj) return;
+  const ll = mapLocalObj.marker.getLatLng();
+  cupoConfig.latLocal = ll.lat;
+  cupoConfig.lngLocal = ll.lng;
+  await guardarUbicacionLocalRemoto(ll.lat, ll.lng);
+  renderUbicacionLocalTexto();
+});
 
 function initEditMap(){
   if(mapEditObj){
@@ -1173,6 +1300,81 @@ function poblarProductosAdmin(){
   const optActual = sel.selectedOptions[0];
   if(optActual && !$("a_precio").value){ $("a_precio").value = optActual.dataset.precio; }
 }
+/* ================= Zonas de entrega: poblar/renderizar/gestionar ================= */
+function agregarZonaRemoto(ciudad, zona, tarifa, tiempo){ return postRemoto({ accion:"zona_nueva", ciudad, zona, tarifa, tiempo }); }
+function actualizarZonaRemoto(ciudad, zona, tarifa, tiempo){ return postRemoto({ accion:"zona_actualizar", ciudad, zona, tarifa, tiempo }); }
+function eliminarZonaRemoto(ciudad, zona){ return postRemoto({ accion:"zona_eliminar", ciudad, zona }); }
+
+function renderListaZonas(filtro){
+  filtro = (filtro || "").toLowerCase().trim();
+  const cont = $("listaZonas");
+  cont.innerHTML = "";
+
+  Object.keys(ZONAS).forEach(ciudad=>{
+    const zonasFiltradas = ZONAS[ciudad].filter(z =>
+      !filtro || z.zona.toLowerCase().includes(filtro) || ciudad.toLowerCase().includes(filtro)
+    );
+    if(!zonasFiltradas.length) return;
+
+    const grupo = document.createElement("div");
+    const titulo = document.createElement("p");
+    titulo.style.cssText = "font-weight:700;color:var(--ink);font-size:13px;margin:0 0 8px;";
+    titulo.textContent = `${ciudad} (${zonasFiltradas.length})`;
+    grupo.appendChild(titulo);
+
+    zonasFiltradas.forEach(z=>{
+      const fila = document.createElement("div");
+      fila.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px;";
+      fila.innerHTML = `
+        <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(z.zona)}</span>
+        <input type="number" min="0" step="0.01" value="${z.tarifa}" class="tarifa-zona-input" style="width:70px;border:1px solid var(--line);border-radius:6px;padding:5px 7px;background:var(--field-bg);color:var(--field-text);font-size:12.5px;">
+        <input type="text" value="${escapeHtml(z.tiempo)}" class="tiempo-zona-input" style="width:90px;border:1px solid var(--line);border-radius:6px;padding:5px 7px;background:var(--field-bg);color:var(--field-text);font-size:12.5px;">
+        <button class="ghost btn-eliminar-zona" style="font-size:11px;">Eliminar</button>
+      `;
+      const guardarCambios = async ()=>{
+        const nuevaTarifa = parseFloat(fila.querySelector(".tarifa-zona-input").value) || 0;
+        const nuevoTiempo = fila.querySelector(".tiempo-zona-input").value.trim();
+        z.tarifa = nuevaTarifa; z.tiempo = nuevoTiempo;
+        await actualizarZonaRemoto(ciudad, z.zona, nuevaTarifa, nuevoTiempo);
+      };
+      fila.querySelector(".tarifa-zona-input").addEventListener("change", guardarCambios);
+      fila.querySelector(".tiempo-zona-input").addEventListener("change", guardarCambios);
+      fila.querySelector(".btn-eliminar-zona").addEventListener("click", async ()=>{
+        const ok = confirm(`¿Eliminar la zona "${z.zona}" (${ciudad})?`);
+        if(!ok) return;
+        await eliminarZonaRemoto(ciudad, z.zona);
+        ZONAS[ciudad] = ZONAS[ciudad].filter(x=>x.zona!==z.zona);
+        renderListaZonas($("buscarZona").value);
+      });
+      grupo.appendChild(fila);
+    });
+    cont.appendChild(grupo);
+  });
+
+  if(!cont.children.length){
+    cont.innerHTML = `<p style="color:var(--ink-soft);font-size:13px;">No se encontraron zonas con ese filtro.</p>`;
+  }
+}
+$("buscarZona").addEventListener("input", ()=> renderListaZonas($("buscarZona").value));
+$("btnAgregarZona").addEventListener("click", async ()=>{
+  const ciudad = $("nz_ciudad").value;
+  const zona = $("nz_nombre").value.trim();
+  const tarifa = parseFloat($("nz_tarifa").value);
+  const tiempo = $("nz_tiempo").value.trim();
+  if(!zona){ return; }
+  if(isNaN(tarifa) || tarifa < 0){ return; }
+  if(!tiempo){ return; }
+  if(!ZONAS[ciudad]) ZONAS[ciudad] = [];
+  if(ZONAS[ciudad].some(z=>z.zona.toLowerCase()===zona.toLowerCase())){
+    alert("Ya existe una zona con ese nombre en esa ciudad.");
+    return;
+  }
+  ZONAS[ciudad].push({ zona, tarifa, tiempo });
+  await agregarZonaRemoto(ciudad, zona, tarifa, tiempo);
+  renderListaZonas($("buscarZona").value);
+  $("nz_nombre").value = ""; $("nz_tarifa").value = ""; $("nz_tiempo").value = "";
+});
+
 function renderListaProductos(){
   const contCombo = $("listaProductosCombo");
   const contExtra = $("listaProductosExtra");
@@ -1328,7 +1530,7 @@ function storageDisponible(){
 async function loadData(){
   if(!storageDisponible()){
     pedidos = [];
-    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No" };
+    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null };
     PRODUCTOS = PRODUCTOS_DEFAULT.slice();
     return;
   }
@@ -1342,12 +1544,25 @@ async function loadData(){
     const usados = apertura ? pedidos.filter(p => p.fecha && p.fecha >= apertura).length : pedidos.length;
     const proximoBatch = data.proximoBatch || "";
     const cerrado = data.cerrado === "Si" ? "Si" : "No";
-    cupoConfig = { cupo, usados, apertura, proximoBatch, cerrado };
+    const latLocal = data.latLocal ? Number(data.latLocal) : null;
+    const lngLocal = data.lngLocal ? Number(data.lngLocal) : null;
+    cupoConfig = { cupo, usados, apertura, proximoBatch, cerrado, latLocal, lngLocal };
     PRODUCTOS = (data.productos && data.productos.length) ? data.productos : PRODUCTOS_DEFAULT.slice();
+
+    if(data.zonas && data.zonas.length){
+      const nuevasZonas = {};
+      data.zonas.forEach(z=>{
+        if(!nuevasZonas[z.ciudad]) nuevasZonas[z.ciudad] = [];
+        nuevasZonas[z.ciudad].push({ zona: z.zona, tarifa: Number(z.tarifa)||0, tiempo: z.tiempo||"" });
+      });
+      ZONAS = nuevasZonas;
+    } else {
+      ZONAS = JSON.parse(JSON.stringify(ZONAS_DEFAULT));
+    }
   }catch(e){
     console.error("Error al cargar datos:", e);
     pedidos = [];
-    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No" };
+    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null };
     PRODUCTOS = PRODUCTOS_DEFAULT.slice();
   }
 }
@@ -1375,6 +1590,7 @@ function guardarCupoRemoto(cupo){ return postRemoto({ accion:"cupo", cupo }); }
 function reiniciarAperturaRemoto(fecha){ return postRemoto({ accion:"apertura", fecha }); }
 function guardarProximoBatchRemoto(texto){ return postRemoto({ accion:"proximo_batch", texto }); }
 function guardarCerradoRemoto(cerrado){ return postRemoto({ accion:"cerrado", cerrado }); }
+function guardarUbicacionLocalRemoto(lat, lng){ return postRemoto({ accion:"ubicacion_local", lat, lng }); }
 function agregarProductoRemoto(nombre, precio, categoria){ return postRemoto({ accion:"producto_nuevo", nombre, precio, categoria }); }
 function actualizarProductoRemoto(nombre, precio){ return postRemoto({ accion:"producto_actualizar", nombre, precio }); }
 function eliminarProductoRemoto(nombre){ return postRemoto({ accion:"producto_eliminar", nombre }); }
@@ -1387,11 +1603,16 @@ async function loadPedidosAdmin(){
   }, 4000);
   await loadData();
   clearTimeout(avisoLento);
+  poblarCiudades($("a_ciudad"));
+  poblarCiudades($("e_ciudad"));
   renderAdmin();
   renderCupoStatus();
   renderEstadoTienda();
   poblarProductosAdmin();
   renderListaProductos();
+  initLocalMap();
+  renderUbicacionLocalTexto();
+  renderListaZonas($("buscarZona").value);
   $("loadingNote").classList.add("hidden");
 }
 
@@ -1403,11 +1624,15 @@ $("btnActualizar").addEventListener("click", async ()=>{
   btn.textContent = "Actualizando…";
   try{
     await loadData();
+    poblarCiudades($("a_ciudad"));
+    poblarCiudades($("e_ciudad"));
     renderAdmin();
     renderCupoStatus();
     renderEstadoTienda();
     poblarProductosAdmin();
     renderListaProductos();
+    renderUbicacionLocalTexto();
+    renderListaZonas($("buscarZona").value);
   } finally {
     btn.disabled = false;
     btn.textContent = textoOriginal;
@@ -1441,6 +1666,214 @@ $("btnDescargarExcel").addEventListener("click", ()=>{
 });
 
 /* ================= Render tabla admin ================= */
+/* ================= Hoja de ruta (varios pedidos) ================= */
+function renderListaPedidosRuta(){
+  const cont = $("listaPedidosRuta");
+  const pendientesEnvio = pedidos
+    .map((p,i)=>({...p, _i:i}))
+    .filter(p => p.envio === "Si" && p.lat && p.lng);
+
+  if(!pendientesEnvio.length){
+    cont.innerHTML = `<p style="color:var(--ink-soft);font-size:13px;">No hay pedidos con envío y ubicación en el mapa por ahora.</p>`;
+    return;
+  }
+  cont.innerHTML = pendientesEnvio.map(p => `
+    <label class="ruta-item">
+      <input type="checkbox" class="chk-ruta" value="${p._i}">
+      <span>${escapeHtml(p.nombre)} — ${escapeHtml(p.zona||"")}, ${escapeHtml(p.ciudad||"")} ${p.pagado==='Si' ? '· pagado' : ''}</span>
+    </label>
+  `).join("");
+}
+
+async function obtenerMatrizDuraciones(puntos){
+  try{
+    const coords = puntos.map(p => `${p.lng},${p.lat}`).join(";");
+    const url = `https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(data && data.durations) return data.durations;
+  }catch(e){ console.error("Error calculando la matriz de rutas:", e); }
+  return null;
+}
+
+function optimizarOrdenVecinoMasCercano(matriz){
+  const n = matriz.length;
+  const visitado = new Array(n).fill(false);
+  visitado[0] = true;
+  const orden = [0];
+  let actual = 0;
+  for(let paso=1; paso<n; paso++){
+    let mejor = -1, mejorDur = Infinity;
+    for(let j=0;j<n;j++){
+      if(!visitado[j] && matriz[actual][j] < mejorDur){
+        mejorDur = matriz[actual][j];
+        mejor = j;
+      }
+    }
+    if(mejor === -1) break;
+    visitado[mejor] = true;
+    orden.push(mejor);
+    actual = mejor;
+  }
+  return orden;
+}
+
+function agruparEnRutas(matriz, maxPorRuta){
+  const n = matriz.length; // incluye el local en el índice 0
+  const pendientes = new Set();
+  for(let i=1; i<n; i++) pendientes.add(i);
+
+  const rutas = [];
+  while(pendientes.size > 0){
+    const ruta = [0];
+    let actual = 0;
+    while((ruta.length - 1) < maxPorRuta && pendientes.size > 0){
+      let mejor = -1, mejorDur = Infinity;
+      pendientes.forEach(j=>{
+        if(matriz[actual][j] < mejorDur){ mejorDur = matriz[actual][j]; mejor = j; }
+      });
+      if(mejor === -1) break;
+      ruta.push(mejor);
+      pendientes.delete(mejor);
+      actual = mejor;
+    }
+    rutas.push(ruta);
+  }
+  return rutas;
+}
+
+function renderizarParadasRuta(orden, matriz, puntos){
+  let html = "";
+  let tiempoTotalMin = 0;
+  for(let k=1; k<orden.length; k++){
+    const idxAnterior = orden[k-1];
+    const idxActual = orden[k];
+    const punto = puntos[idxActual];
+    const p = punto.pedido;
+    const minutos = Math.round(matriz[idxAnterior][idxActual] / 60);
+    tiempoTotalMin += minutos;
+    html += `
+      <div class="ruta-parada">
+        <span class="num">${k}</span>
+        <span class="detalle-parada">
+          <strong>${escapeHtml(p.nombre)}</strong> — ${escapeHtml(p.zona||"")}, ${escapeHtml(p.ciudad||"")}<br>
+          <span style="color:var(--ink-soft);">${escapeHtml(p.detalle||"")}</span>
+        </span>
+        <span class="tiempo-tramo">+${minutos} min</span>
+      </div>`;
+  }
+  const coordsRuta = orden.map(idx => `${puntos[idx].lat},${puntos[idx].lng}`).join("/");
+  const linkMaps = `https://www.google.com/maps/dir/${coordsRuta}`;
+  return { html, tiempoTotalMin, linkMaps };
+}
+
+$("btnSugerirRutas").addEventListener("click", async ()=>{
+  const resultado = $("resultadoRutasAuto");
+
+  if(!cupoConfig.latLocal || !cupoConfig.lngLocal){
+    resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">Primero guarda la ubicación de tu local (arriba, en "Ubicación de tu local").</p>`;
+    return;
+  }
+
+  const maxPorRuta = parseInt($("s_maxporruta").value, 10) || 5;
+  const conEnvio = pedidos.filter(p => p.envio === "Si" && p.lat && p.lng);
+
+  if(conEnvio.length < 1){
+    resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">No hay pedidos con envío y ubicación en el mapa por ahora.</p>`;
+    return;
+  }
+
+  const btn = $("btnSugerirRutas");
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Calculando…";
+
+  try{
+    const puntos = [
+      { lat: cupoConfig.latLocal, lng: cupoConfig.lngLocal, label: "Tu local" },
+      ...conEnvio.map(p => ({ lat: p.lat, lng: p.lng, label: p.nombre, pedido: p }))
+    ];
+
+    const matriz = await obtenerMatrizDuraciones(puntos);
+    if(!matriz){
+      resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">No se pudo calcular las rutas en este momento. Intenta de nuevo en unos segundos.</p>`;
+      return;
+    }
+
+    const rutas = agruparEnRutas(matriz, maxPorRuta);
+
+    resultado.innerHTML = rutas.map((orden, idx)=>{
+      const { html, tiempoTotalMin, linkMaps } = renderizarParadasRuta(orden, matriz, puntos);
+      return `
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);">
+          <p style="font-weight:700;color:var(--ink);margin:0 0 4px;">Ruta sugerida ${idx+1} — ${orden.length-1} parada${orden.length-1===1?'':'s'}</p>
+          <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;">Tiempo estimado: <strong style="color:var(--ink);">${tiempoTotalMin} min</strong> desde tu local</p>
+          ${html}
+          <a class="primary" style="display:block;text-align:center;text-decoration:none;margin-top:8px;" href="${linkMaps}" target="_blank" rel="noopener">Abrir esta ruta en Google Maps</a>
+        </div>`;
+    }).join("");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+});
+
+$("btnOptimizarRuta").addEventListener("click", async ()=>{
+  const resultado = $("resultadoRuta");
+  const seleccionados = Array.from(document.querySelectorAll(".chk-ruta:checked")).map(chk => Number(chk.value));
+
+  if(!cupoConfig.latLocal || !cupoConfig.lngLocal){
+    resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">Primero guarda la ubicación de tu local (arriba, en "Ubicación de tu local").</p>`;
+    return;
+  }
+  if(seleccionados.length < 2){
+    resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">Marca al menos 2 pedidos para optimizar una ruta (con 1 solo, usa "Ver ruta" directo en la tabla).</p>`;
+    return;
+  }
+
+  const btn = $("btnOptimizarRuta");
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Calculando…";
+
+  try{
+    const puntos = [
+      { lat: cupoConfig.latLocal, lng: cupoConfig.lngLocal, label: "Tu local" },
+      ...seleccionados.map(i => ({ lat: pedidos[i].lat, lng: pedidos[i].lng, label: pedidos[i].nombre, pedido: pedidos[i] }))
+    ];
+
+    const matriz = await obtenerMatrizDuraciones(puntos);
+    if(!matriz){
+      resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">No se pudo calcular la ruta en este momento. Intenta de nuevo en unos segundos.</p>`;
+      return;
+    }
+
+    const orden = optimizarOrdenVecinoMasCercano(matriz);
+    const { html, tiempoTotalMin, linkMaps } = renderizarParadasRuta(orden, matriz, puntos);
+
+    resultado.innerHTML = `
+      <p style="font-size:13px;color:var(--ink-soft);margin:14px 0 10px;">
+        Tiempo estimado total de trayecto: <strong style="color:var(--ink);">${tiempoTotalMin} min</strong>
+        (empezando desde tu local)
+      </p>
+      ${html}
+      <a class="primary" style="display:block;text-align:center;text-decoration:none;margin-top:12px;" href="${linkMaps}" target="_blank" rel="noopener">Abrir ruta completa en Google Maps</a>
+    `;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+});
+
+function enlaceMapaPedido(p){
+  if(!p.mapsLink) return "—";
+  if(cupoConfig.latLocal && cupoConfig.lngLocal && p.lat && p.lng){
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${cupoConfig.latLocal},${cupoConfig.lngLocal}&destination=${p.lat},${p.lng}&travelmode=driving`;
+    return `<a class="maps-link" href="${url}" target="_blank" rel="noopener">Ver ruta ↗</a>`;
+  }
+  return `<a class="maps-link" href="${escapeHtml(p.mapsLink)}" target="_blank" rel="noopener">Ver mapa ↗</a>`;
+}
+
 function calcularTotalesPorCategoria(){
   let totalCombo = 0, totalExtra = 0, totalDelivery = 0;
   pedidos.forEach(p=>{
@@ -1470,6 +1903,7 @@ function calcularTotalesPorCategoria(){
 }
 
 function renderAdmin(){
+  renderListaPedidosRuta();
   const tbody = $("tbody");
   tbody.innerHTML = "";
 
@@ -1499,7 +1933,7 @@ function renderAdmin(){
         <td class="num"><strong>${money(p.total || 0)}</strong></td>
         <td><span class="badge ${p.pagado==='Si'?'pagado':'pendiente'}">${p.pagado==='Si'?'Pagado':'Pendiente'}</span></td>
         <td class="dir">${escapeHtml(p.direccion||"")}</td>
-        <td>${p.mapsLink ? `<a class="maps-link" href="${escapeHtml(p.mapsLink)}" target="_blank" rel="noopener">Ver mapa ↗</a>` : "—"}</td>
+        <td>${enlaceMapaPedido(p)}</td>
         <td>
           <div class="row-actions">
             <button class="editar" data-i="${i}">Editar</button>
