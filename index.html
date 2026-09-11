@@ -987,8 +987,8 @@ function abrirEditarPedido(indice){
     poblarZonas($("e_zona"), "", "Primero elige ciudad");
   }
 
-  setEntregaEdit(esEnvio);
   $("editOverlay").classList.remove("hidden");
+  setEntregaEdit(esEnvio);
 }
 $("btnCancelarEdit").addEventListener("click", ()=>{
   $("editOverlay").classList.add("hidden");
