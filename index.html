@@ -102,23 +102,6 @@
   .carrito-subtotal{text-align:right;font-weight:700;font-size:14px;color:var(--ink);margin-top:8px;}
   .carrito-subtotal.hidden{display:none;}
 
-  .ruta-item{
-    display:flex;align-items:center;gap:10px;background:var(--field-bg);border:1px solid var(--line);
-    border-radius:7px;padding:8px 10px;font-size:13px;color:var(--field-text);cursor:pointer;
-  }
-  .ruta-item input{width:auto;}
-  .ruta-parada{
-    display:flex;align-items:flex-start;gap:10px;background:var(--field-bg);border:1px solid var(--line);
-    border-radius:7px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:var(--field-text);
-  }
-  .ruta-parada .num{
-    background:var(--gold);color:#1A1408;font-weight:800;border-radius:50%;
-    width:22px;height:22px;display:flex;align-items:center;justify-content:center;
-    font-size:12px;flex-shrink:0;
-  }
-  .ruta-parada .detalle-parada{flex:1;}
-  .ruta-parada .tiempo-tramo{color:var(--ink-soft);font-size:12px;white-space:nowrap;}
-
   .zona-info{
     grid-column:1/-1;background:var(--teal-bg);border:1px solid rgba(79,169,138,.35);border-radius:8px;
     padding:10px 14px;font-size:13px;color:var(--teal);font-weight:600;display:none;
@@ -215,6 +198,7 @@
   .row-actions button.toggle:hover{border-color:var(--teal);color:var(--teal);}
   .row-actions button.editar:hover{border-color:var(--gold);color:var(--gold-deep);}
   .row-actions button.del:hover{border-color:var(--danger);color:var(--danger);}
+  .row-actions button.cancelar:hover{border-color:var(--amber);color:var(--amber);}
 
   .empty{padding:36px 22px;text-align:center;color:var(--ink-soft);font-size:13px;}
   .empty b{color:var(--ink);}
@@ -377,6 +361,18 @@
     <div class="field full">
       <label for="e_telefono">Celular (WhatsApp)</label>
       <input type="tel" id="e_telefono">
+    </div>
+    <div class="field full">
+      <label>Productos del pedido</label>
+      <div class="cart-add-row">
+        <select id="e_producto_sel"></select>
+        <input type="number" id="e_producto_cant" min="1" step="1" value="1">
+        <button type="button" class="ghost" id="btnAgregarCarritoEdit">Agregar</button>
+      </div>
+    </div>
+    <div class="field full">
+      <div id="carritoEdit" class="carrito-lista"></div>
+      <div class="carrito-subtotal hidden" id="carritoSubtotalEdit"></div>
     </div>
     <div class="field full">
       <label>Entrega</label>
@@ -578,21 +574,19 @@
         <label for="a_telefono">Celular (WhatsApp)</label>
         <input type="tel" id="a_telefono" placeholder="09XXXXXXXX">
       </div>
-      <div class="field" style="grid-column:span 2;">
-        <label for="a_detalle">Producto</label>
-        <select id="a_detalle">
-          <option value="Combo Lost (hamburguesa + papas + cola)">Combo Lost (hamburguesa + papas + cola)</option>
-        </select>
+      <div class="field" style="grid-column:span 3;">
+        <label>Agrega productos al pedido</label>
+        <div class="cart-add-row">
+          <select id="a_producto_sel"></select>
+          <input type="number" id="a_producto_cant" min="1" step="1" value="1">
+          <button type="button" class="ghost" id="btnAgregarCarritoAdmin">Agregar</button>
+        </div>
       </div>
-      <div class="field">
-        <label for="a_cantidad">Cantidad</label>
-        <input type="number" id="a_cantidad" min="1" step="1" placeholder="1">
+      <div class="field" style="grid-column:span 3;">
+        <div id="carritoAdmin" class="carrito-lista"></div>
+        <div class="carrito-subtotal hidden" id="carritoSubtotalAdmin"></div>
       </div>
 
-      <div class="field">
-        <label for="a_precio">Precio unitario</label>
-        <input type="number" id="a_precio" min="0" step="0.01" placeholder="0.00">
-      </div>
       <div class="field">
         <label for="a_envio">Envío</label>
         <select id="a_envio">
@@ -643,32 +637,6 @@
     <div class="metric"><div class="label">Total facturado</div><div class="value" id="m_facturado">$0.00</div></div>
     <div class="metric cobrado"><div class="label">Cobrado</div><div class="value" id="m_cobrado">$0.00</div></div>
     <div class="metric pend"><div class="label">Pendiente de cobro</div><div class="value" id="m_pendiente">$0.00</div></div>
-  </div>
-
-  <div class="card" id="rutaCard" style="margin-bottom:18px;padding:0;">
-    <h2>Hoja de ruta (varios pedidos a la vez)</h2>
-    <div style="padding:18px 22px;">
-      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;font-weight:700;">Manual: tú eliges cuáles</p>
-      <div id="listaPedidosRuta" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
-      <button class="primary" id="btnOptimizarRuta" style="margin-top:0;">Optimizar ruta</button>
-      <div id="resultadoRuta"></div>
-
-      <hr style="border:none;border-top:1px solid var(--line);margin:22px 0;">
-
-      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;font-weight:700;">Automático: el sistema arma las rutas por ti</p>
-      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 12px;">
-        Agrupa TODOS los pedidos pendientes con envío por cercanía real, en tandas de máximo
-        el tamaño que elijas, para que ningún repartidor cargue más de la cuenta.
-      </p>
-      <div class="settings-row" style="margin-bottom:12px;">
-        <div class="settings-field">
-          <label for="s_maxporruta">Máximo de paradas por ruta</label>
-          <input type="number" id="s_maxporruta" min="1" step="1" value="5">
-        </div>
-        <button class="primary" id="btnSugerirRutas" style="margin-top:0;">Sugerir rutas automáticas</button>
-      </div>
-      <div id="resultadoRutasAuto"></div>
-    </div>
   </div>
 
   <div class="card" id="tableCard">
@@ -915,6 +883,7 @@ $("btnEnviarCliente").addEventListener("click", async ()=>{
       notas,
       mapsLink, lat, lng,
       pagado: "No",
+      cancelado: "No",
       subtotal,
       total
     };
@@ -1179,6 +1148,20 @@ function abrirEditarPedido(indice){
   $("e_notas").value = p.notas || "";
   if(mapEditObj){ mapEditObj.posicionado = false; }
 
+  let itemsExistentes = [];
+  if(p.items){
+    try{ itemsExistentes = JSON.parse(p.items); }catch(e){ itemsExistentes = []; }
+  }
+  if(!itemsExistentes.length && p.detalle){
+    // Pedido antiguo de un solo producto: lo representamos como un ítem del carrito
+    const precioUnit = (p.precio !== null && p.precio !== undefined && p.precio !== "")
+      ? Number(p.precio)
+      : (p.cantidad ? (Number(p.subtotal)||0) / p.cantidad : 0);
+    itemsExistentes = [{ nombre: p.detalle, precio: precioUnit || 0, cantidad: Number(p.cantidad) || 1 }];
+  }
+  carritoEdit = itemsExistentes.map(i=>({ nombre: i.nombre, precio: Number(i.precio)||0, cantidad: Number(i.cantidad)||0 }));
+  renderCarritoEdit();
+
   const esEnvio = p.envio === "Si";
   document.querySelector(`input[name="e_entrega"][value="${esEnvio?"Si":"No"}"]`).checked = true;
 
@@ -1212,6 +1195,7 @@ $("btnGuardarEdit").addEventListener("click", async ()=>{
 
   $("e_errorMsg").textContent = "";
   if(!nombre){ $("e_errorMsg").textContent = "Ingresa el nombre."; return; }
+  if(!carritoEdit.length){ $("e_errorMsg").textContent = "El pedido necesita al menos un producto."; return; }
   if(esEnvio && (!ciudad || !zona)){ $("e_errorMsg").textContent = "Selecciona ciudad y zona."; return; }
 
   let costoEnvio = 0, tiempoEstimado = "";
@@ -1220,8 +1204,10 @@ $("btnGuardarEdit").addEventListener("click", async ()=>{
     costoEnvio = parseFloat(opt.dataset.tarifa);
     tiempoEstimado = opt.dataset.tiempo;
   }
-  const subtotalActual = Number(p.subtotal) || 0;
-  const total = subtotalActual + costoEnvio;
+  const detalle = carritoEdit.map(i=>`${i.cantidad}x ${i.nombre}`).join(", ");
+  const cantidad = carritoEdit.reduce((s,i)=>s+i.cantidad,0);
+  const subtotal = carritoEdit.reduce((s,i)=>s+i.cantidad*i.precio,0);
+  const total = subtotal + costoEnvio;
 
   let lat = p.lat, lng = p.lng, mapsLink = p.mapsLink || "";
   if(esEnvio && mapEditObj){
@@ -1234,6 +1220,8 @@ $("btnGuardarEdit").addEventListener("click", async ()=>{
 
   const cambios = {
     nombre, telefono,
+    detalle, cantidad, precio: "",
+    items: JSON.stringify(carritoEdit), subtotal,
     envio: esEnvio ? "Si" : "No",
     ciudad: esEnvio ? ciudad : "",
     zona: esEnvio ? zona : "",
@@ -1353,20 +1341,121 @@ $("btnAgregarCarritoCliente").addEventListener("click", ()=>{
 });
 
 function poblarProductosAdmin(){
-  const sel = $("a_detalle");
-  const valorPrevio = sel.value;
+  const sel = $("a_producto_sel");
   sel.innerHTML = "";
-  PRODUCTOS.forEach(p=>{
+  PRODUCTOS.forEach((p, i)=>{
     const opt = document.createElement("option");
-    opt.value = p.nombre;
+    opt.value = i;
     opt.dataset.precio = p.precio;
-    opt.textContent = p.nombre;
+    opt.dataset.nombre = p.nombre;
+    opt.textContent = `${p.nombre} — ${money(p.precio)}`;
     sel.appendChild(opt);
   });
-  if(PRODUCTOS.some(p=>p.nombre===valorPrevio)) sel.value = valorPrevio;
-  const optActual = sel.selectedOptions[0];
-  if(optActual && !$("a_precio").value){ $("a_precio").value = optActual.dataset.precio; }
+  poblarProductosEdit();
 }
+function poblarProductosEdit(){
+  const sel = $("e_producto_sel");
+  sel.innerHTML = "";
+  PRODUCTOS.forEach((p, i)=>{
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.dataset.precio = p.precio;
+    opt.dataset.nombre = p.nombre;
+    opt.textContent = `${p.nombre} — ${money(p.precio)}`;
+    sel.appendChild(opt);
+  });
+}
+
+/* ================= Carrito de compras (pedido manual admin) ================= */
+let carritoAdmin = [];
+function agregarItemCarritoAdmin(nombre, precio, cantidad){
+  const existente = carritoAdmin.find(i=>i.nombre===nombre);
+  if(existente){ existente.cantidad += cantidad; }
+  else{ carritoAdmin.push({ nombre, precio, cantidad }); }
+  renderCarritoAdmin();
+}
+function quitarDeCarritoAdmin(nombre){
+  carritoAdmin = carritoAdmin.filter(i=>i.nombre!==nombre);
+  renderCarritoAdmin();
+}
+function renderCarritoAdmin(){
+  const cont = $("carritoAdmin");
+  const subtotalWrap = $("carritoSubtotalAdmin");
+  if(!carritoAdmin.length){
+    cont.innerHTML = `<p class="carrito-vacio">Aún no has agregado productos.</p>`;
+    subtotalWrap.classList.add("hidden");
+    return;
+  }
+  let subtotal = 0;
+  cont.innerHTML = carritoAdmin.map(i=>{
+    subtotal += i.cantidad * i.precio;
+    return `
+      <div class="carrito-item">
+        <span class="ci-nombre">${i.cantidad}x ${escapeHtml(i.nombre)}</span>
+        <span class="ci-precio">${money(i.cantidad*i.precio)}</span>
+        <button type="button" data-nombre="${escapeHtml(i.nombre)}" class="btn-quitar-carrito-admin" title="Quitar">✕</button>
+      </div>`;
+  }).join("");
+  cont.querySelectorAll(".btn-quitar-carrito-admin").forEach(btn=>{
+    btn.addEventListener("click", ()=> quitarDeCarritoAdmin(btn.dataset.nombre));
+  });
+  subtotalWrap.classList.remove("hidden");
+  subtotalWrap.textContent = `Subtotal: ${money(subtotal)}`;
+}
+$("btnAgregarCarritoAdmin").addEventListener("click", ()=>{
+  const opt = $("a_producto_sel").selectedOptions[0];
+  if(!opt) return;
+  const cantidad = parseInt($("a_producto_cant").value, 10);
+  if(!cantidad || cantidad <= 0) return;
+  agregarItemCarritoAdmin(opt.dataset.nombre, parseFloat(opt.dataset.precio), cantidad);
+  $("a_producto_cant").value = 1;
+});
+
+/* ================= Carrito de compras (editar pedido existente) ================= */
+let carritoEdit = [];
+function agregarItemCarritoEdit(nombre, precio, cantidad){
+  const existente = carritoEdit.find(i=>i.nombre===nombre);
+  if(existente){ existente.cantidad += cantidad; }
+  else{ carritoEdit.push({ nombre, precio, cantidad }); }
+  renderCarritoEdit();
+}
+function quitarDeCarritoEdit(nombre){
+  carritoEdit = carritoEdit.filter(i=>i.nombre!==nombre);
+  renderCarritoEdit();
+}
+function renderCarritoEdit(){
+  const cont = $("carritoEdit");
+  const subtotalWrap = $("carritoSubtotalEdit");
+  if(!carritoEdit.length){
+    cont.innerHTML = `<p class="carrito-vacio">Este pedido no tiene productos. Agrega al menos uno.</p>`;
+    subtotalWrap.classList.add("hidden");
+    return;
+  }
+  let subtotal = 0;
+  cont.innerHTML = carritoEdit.map(i=>{
+    subtotal += i.cantidad * i.precio;
+    return `
+      <div class="carrito-item">
+        <span class="ci-nombre">${i.cantidad}x ${escapeHtml(i.nombre)}</span>
+        <span class="ci-precio">${money(i.cantidad*i.precio)}</span>
+        <button type="button" data-nombre="${escapeHtml(i.nombre)}" class="btn-quitar-carrito-edit" title="Quitar">✕</button>
+      </div>`;
+  }).join("");
+  cont.querySelectorAll(".btn-quitar-carrito-edit").forEach(btn=>{
+    btn.addEventListener("click", ()=> quitarDeCarritoEdit(btn.dataset.nombre));
+  });
+  subtotalWrap.classList.remove("hidden");
+  subtotalWrap.textContent = `Subtotal: ${money(subtotal)}`;
+}
+$("btnAgregarCarritoEdit").addEventListener("click", ()=>{
+  const opt = $("e_producto_sel").selectedOptions[0];
+  if(!opt) return;
+  const cantidad = parseInt($("e_producto_cant").value, 10);
+  if(!cantidad || cantidad <= 0) return;
+  agregarItemCarritoEdit(opt.dataset.nombre, parseFloat(opt.dataset.precio), cantidad);
+  $("e_producto_cant").value = 1;
+});
+
 /* ================= Zonas de entrega: poblar/renderizar/gestionar ================= */
 function agregarZonaRemoto(ciudad, zona, tarifa, tiempo){ return postRemoto({ accion:"zona_nueva", ciudad, zona, tarifa, tiempo }); }
 function actualizarZonaRemoto(ciudad, zona, tarifa, tiempo){ return postRemoto({ accion:"zona_actualizar", ciudad, zona, tarifa, tiempo }); }
@@ -1526,19 +1615,12 @@ $("a_zona").addEventListener("change", ()=>{
   const opt = $("a_zona").selectedOptions[0];
   if(opt && opt.dataset.tarifa){ $("a_costoenvio").value = opt.dataset.tarifa; }
 });
-$("a_detalle").addEventListener("change", ()=>{
-  const opt = $("a_detalle").selectedOptions[0];
-  if(opt && opt.dataset.precio){ $("a_precio").value = opt.dataset.precio; }
-});
 
 let enviandoAdmin = false;
 $("btnIngresarAdmin").addEventListener("click", async ()=>{
   if(enviandoAdmin) return;
   const nombre = $("a_nombre").value.trim();
   const telefono = $("a_telefono").value.trim();
-  const detalle = $("a_detalle").value;
-  const cantidad = parseFloat($("a_cantidad").value);
-  const precio = parseFloat($("a_precio").value);
   const envio = $("a_envio").value;
   const ciudad = $("a_ciudad").value;
   const zona = $("a_zona").value;
@@ -1549,9 +1631,7 @@ $("btnIngresarAdmin").addEventListener("click", async ()=>{
 
   $("errorMsgAdmin").textContent = "";
   if(!nombre){ $("errorMsgAdmin").textContent = "Ingresa el nombre."; return; }
-  if(!cantidad || cantidad<=0){ $("errorMsgAdmin").textContent = "La cantidad debe ser mayor a 0."; return; }
-  if(isNaN(precio) || precio<0){ $("errorMsgAdmin").textContent = "Ingresa un precio válido."; return; }
-  if(envio==="Si" && !direccion){ $("errorMsgAdmin").textContent = "Ingresa las referencias."; return; }
+  if(!carritoAdmin.length){ $("errorMsgAdmin").textContent = "Agrega al menos un producto al pedido."; return; }
 
   enviandoAdmin = true;
   const btnIngresar = $("btnIngresarAdmin");
@@ -1560,19 +1640,22 @@ $("btnIngresarAdmin").addEventListener("click", async ()=>{
   btnIngresar.textContent = "Ingresando…";
 
   try{
-    const subtotal = cantidad * precio;
+    const detalle = carritoAdmin.map(i=>`${i.cantidad}x ${i.nombre}`).join(", ");
+    const cantidad = carritoAdmin.reduce((s,i)=>s+i.cantidad,0);
+    const subtotal = carritoAdmin.reduce((s,i)=>s+i.cantidad*i.precio,0);
     const total = envio==="Si" ? subtotal + costoEnvio : subtotal;
 
     const nuevoPedido = {
       id: Date.now() + "_" + Math.random().toString(36).slice(2,7),
       fecha: new Date().toISOString(),
-      nombre, telefono, detalle, cantidad, precio, subtotal,
+      nombre, telefono, detalle, cantidad, precio: "",
+      items: JSON.stringify(carritoAdmin), subtotal,
       envio, ciudad: envio==="Si"?ciudad:"", zona: envio==="Si"?zona:"",
       tiempoEstimado: envio==="Si" ? ($("a_zona").selectedOptions[0]?.dataset.tiempo || "") : "",
       costoEnvio: envio==="Si"?costoEnvio:0,
       direccion: envio==="Si" ? direccion : "Retiro en local",
       mapsLink: envio==="Si" ? mapsLink : "",
-      pagado, total
+      pagado, cancelado: "No", total
     };
     pedidos.push(nuevoPedido);
     cupoConfig.usados += 1;
@@ -1580,7 +1663,9 @@ $("btnIngresarAdmin").addEventListener("click", async ()=>{
     renderAdmin();
     renderCupoStatus();
 
-    ["a_nombre","a_telefono","a_cantidad","a_precio","a_direccion","a_maps"].forEach(id=> $(id).value="");
+    carritoAdmin = [];
+    renderCarritoAdmin();
+    ["a_nombre","a_telefono","a_direccion","a_maps"].forEach(id=> $(id).value="");
     $("a_envio").value="No"; $("a_pagado").value="No";
     $("a_envio").dispatchEvent(new Event("change"));
   } finally {
@@ -1608,7 +1693,9 @@ async function loadData(){
     pedidos = data.pedidos || [];
     const cupo = data.cupo || CUPO_DEFAULT;
     const apertura = data.apertura || "";
-    const usados = apertura ? pedidos.filter(p => p.fecha && p.fecha >= apertura).length : pedidos.length;
+    const usados = apertura
+      ? pedidos.filter(p => p.fecha && p.fecha >= apertura && p.cancelado !== "Si").length
+      : pedidos.filter(p => p.cancelado !== "Si").length;
     const proximoBatch = data.proximoBatch || "";
     const cerrado = data.cerrado === "Si" ? "Si" : "No";
     const latLocal = data.latLocal ? Number(data.latLocal) : null;
@@ -1737,204 +1824,6 @@ $("btnDescargarExcel").addEventListener("click", ()=>{
 });
 
 /* ================= Render tabla admin ================= */
-/* ================= Hoja de ruta (varios pedidos) ================= */
-function renderListaPedidosRuta(){
-  const cont = $("listaPedidosRuta");
-  const pendientesEnvio = pedidos
-    .map((p,i)=>({...p, _i:i}))
-    .filter(p => p.envio === "Si" && p.lat && p.lng);
-
-  if(!pendientesEnvio.length){
-    cont.innerHTML = `<p style="color:var(--ink-soft);font-size:13px;">No hay pedidos con envío y ubicación en el mapa por ahora.</p>`;
-    return;
-  }
-  cont.innerHTML = pendientesEnvio.map(p => `
-    <label class="ruta-item">
-      <input type="checkbox" class="chk-ruta" value="${p._i}">
-      <span>${escapeHtml(p.nombre)} — ${escapeHtml(p.zona||"")}, ${escapeHtml(p.ciudad||"")} ${p.pagado==='Si' ? '· pagado' : ''}</span>
-    </label>
-  `).join("");
-}
-
-async function obtenerMatrizDuraciones(puntos){
-  try{
-    const coords = puntos.map(p => `${p.lng},${p.lat}`).join(";");
-    const url = `https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if(data && data.durations) return data.durations;
-  }catch(e){ console.error("Error calculando la matriz de rutas:", e); }
-  return null;
-}
-
-function optimizarOrdenVecinoMasCercano(matriz){
-  const n = matriz.length;
-  const visitado = new Array(n).fill(false);
-  visitado[0] = true;
-  const orden = [0];
-  let actual = 0;
-  for(let paso=1; paso<n; paso++){
-    let mejor = -1, mejorDur = Infinity;
-    for(let j=0;j<n;j++){
-      if(!visitado[j] && matriz[actual][j] < mejorDur){
-        mejorDur = matriz[actual][j];
-        mejor = j;
-      }
-    }
-    if(mejor === -1) break;
-    visitado[mejor] = true;
-    orden.push(mejor);
-    actual = mejor;
-  }
-  return orden;
-}
-
-function agruparEnRutas(matriz, maxPorRuta){
-  const n = matriz.length; // incluye el local en el índice 0
-  const pendientes = new Set();
-  for(let i=1; i<n; i++) pendientes.add(i);
-
-  const rutas = [];
-  while(pendientes.size > 0){
-    const ruta = [0];
-    let actual = 0;
-    while((ruta.length - 1) < maxPorRuta && pendientes.size > 0){
-      let mejor = -1, mejorDur = Infinity;
-      pendientes.forEach(j=>{
-        if(matriz[actual][j] < mejorDur){ mejorDur = matriz[actual][j]; mejor = j; }
-      });
-      if(mejor === -1) break;
-      ruta.push(mejor);
-      pendientes.delete(mejor);
-      actual = mejor;
-    }
-    rutas.push(ruta);
-  }
-  return rutas;
-}
-
-function renderizarParadasRuta(orden, matriz, puntos){
-  let html = "";
-  let tiempoTotalMin = 0;
-  for(let k=1; k<orden.length; k++){
-    const idxAnterior = orden[k-1];
-    const idxActual = orden[k];
-    const punto = puntos[idxActual];
-    const p = punto.pedido;
-    const minutos = Math.round(matriz[idxAnterior][idxActual] / 60);
-    tiempoTotalMin += minutos;
-    html += `
-      <div class="ruta-parada">
-        <span class="num">${k}</span>
-        <span class="detalle-parada">
-          <strong>${escapeHtml(p.nombre)}</strong> — ${escapeHtml(p.zona||"")}, ${escapeHtml(p.ciudad||"")}<br>
-          <span style="color:var(--ink-soft);">${escapeHtml(p.detalle||"")}</span>
-        </span>
-        <span class="tiempo-tramo">+${minutos} min</span>
-      </div>`;
-  }
-  const coordsRuta = orden.map(idx => `${puntos[idx].lat},${puntos[idx].lng}`).join("/");
-  const linkMaps = `https://www.google.com/maps/dir/${coordsRuta}`;
-  return { html, tiempoTotalMin, linkMaps };
-}
-
-$("btnSugerirRutas").addEventListener("click", async ()=>{
-  const resultado = $("resultadoRutasAuto");
-
-  if(!cupoConfig.latLocal || !cupoConfig.lngLocal){
-    resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">Primero guarda la ubicación de tu local (arriba, en "Ubicación de tu local").</p>`;
-    return;
-  }
-
-  const maxPorRuta = parseInt($("s_maxporruta").value, 10) || 5;
-  const conEnvio = pedidos.filter(p => p.envio === "Si" && p.lat && p.lng);
-
-  if(conEnvio.length < 1){
-    resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">No hay pedidos con envío y ubicación en el mapa por ahora.</p>`;
-    return;
-  }
-
-  const btn = $("btnSugerirRutas");
-  const textoOriginal = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "Calculando…";
-
-  try{
-    const puntos = [
-      { lat: cupoConfig.latLocal, lng: cupoConfig.lngLocal, label: "Tu local" },
-      ...conEnvio.map(p => ({ lat: p.lat, lng: p.lng, label: p.nombre, pedido: p }))
-    ];
-
-    const matriz = await obtenerMatrizDuraciones(puntos);
-    if(!matriz){
-      resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">No se pudo calcular las rutas en este momento. Intenta de nuevo en unos segundos.</p>`;
-      return;
-    }
-
-    const rutas = agruparEnRutas(matriz, maxPorRuta);
-
-    resultado.innerHTML = rutas.map((orden, idx)=>{
-      const { html, tiempoTotalMin, linkMaps } = renderizarParadasRuta(orden, matriz, puntos);
-      return `
-        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);">
-          <p style="font-weight:700;color:var(--ink);margin:0 0 4px;">Ruta sugerida ${idx+1} — ${orden.length-1} parada${orden.length-1===1?'':'s'}</p>
-          <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;">Tiempo estimado: <strong style="color:var(--ink);">${tiempoTotalMin} min</strong> desde tu local</p>
-          ${html}
-          <a class="primary" style="display:block;text-align:center;text-decoration:none;margin-top:8px;" href="${linkMaps}" target="_blank" rel="noopener">Abrir esta ruta en Google Maps</a>
-        </div>`;
-    }).join("");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = textoOriginal;
-  }
-});
-
-$("btnOptimizarRuta").addEventListener("click", async ()=>{
-  const resultado = $("resultadoRuta");
-  const seleccionados = Array.from(document.querySelectorAll(".chk-ruta:checked")).map(chk => Number(chk.value));
-
-  if(!cupoConfig.latLocal || !cupoConfig.lngLocal){
-    resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">Primero guarda la ubicación de tu local (arriba, en "Ubicación de tu local").</p>`;
-    return;
-  }
-  if(seleccionados.length < 2){
-    resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">Marca al menos 2 pedidos para optimizar una ruta (con 1 solo, usa "Ver ruta" directo en la tabla).</p>`;
-    return;
-  }
-
-  const btn = $("btnOptimizarRuta");
-  const textoOriginal = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "Calculando…";
-
-  try{
-    const puntos = [
-      { lat: cupoConfig.latLocal, lng: cupoConfig.lngLocal, label: "Tu local" },
-      ...seleccionados.map(i => ({ lat: pedidos[i].lat, lng: pedidos[i].lng, label: pedidos[i].nombre, pedido: pedidos[i] }))
-    ];
-
-    const matriz = await obtenerMatrizDuraciones(puntos);
-    if(!matriz){
-      resultado.innerHTML = `<p style="color:var(--danger);font-size:13px;">No se pudo calcular la ruta en este momento. Intenta de nuevo en unos segundos.</p>`;
-      return;
-    }
-
-    const orden = optimizarOrdenVecinoMasCercano(matriz);
-    const { html, tiempoTotalMin, linkMaps } = renderizarParadasRuta(orden, matriz, puntos);
-
-    resultado.innerHTML = `
-      <p style="font-size:13px;color:var(--ink-soft);margin:14px 0 10px;">
-        Tiempo estimado total de trayecto: <strong style="color:var(--ink);">${tiempoTotalMin} min</strong>
-        (empezando desde tu local)
-      </p>
-      ${html}
-      <a class="primary" style="display:block;text-align:center;text-decoration:none;margin-top:12px;" href="${linkMaps}" target="_blank" rel="noopener">Abrir ruta completa en Google Maps</a>
-    `;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = textoOriginal;
-  }
-});
 
 function enlaceMapaPedido(p){
   if(!p.mapsLink) return "—";
@@ -1949,7 +1838,7 @@ function calcularCantidadesPorProducto(){
   const cantidades = {};
   PRODUCTOS.forEach(p => cantidades[p.nombre] = 0);
 
-  pedidos.forEach(p=>{
+  pedidos.filter(p=>p.cancelado !== "Si").forEach(p=>{
     let items = [];
     if(p.items){
       try{ items = JSON.parse(p.items); }catch(e){ items = []; }
@@ -1982,7 +1871,7 @@ function renderCantidadesPorProducto(){
 
 function calcularTotalesPorCategoria(){
   let totalCombo = 0, totalExtra = 0, totalDelivery = 0;
-  pedidos.forEach(p=>{
+  pedidos.filter(p=>p.cancelado !== "Si").forEach(p=>{
     totalDelivery += (p.envio === "Si") ? (Number(p.costoEnvio) || 0) : 0;
 
     let items = [];
@@ -2009,7 +1898,6 @@ function calcularTotalesPorCategoria(){
 }
 
 function renderAdmin(){
-  renderListaPedidosRuta();
   const tbody = $("tbody");
   tbody.innerHTML = "";
 
@@ -2045,17 +1933,20 @@ function renderAdmin(){
             <button class="editar" data-i="${i}">Editar</button>
             <button class="copiar-mensaje" data-i="${i}">Copiar mensaje</button>
             <button class="toggle" data-i="${i}">${p.pagado==='Si'?'Marcar pendiente':'Marcar pagado'}</button>
+            <button class="cancelar" data-i="${i}">${p.cancelado==='Si'?'Reactivar pedido':'Pedido cancelado'}</button>
             <button class="del" data-i="${i}">Eliminar</button>
           </div>
         </td>
       `;
+      if(p.cancelado === "Si"){ tr.style.opacity = "0.5"; }
       tbody.appendChild(tr);
     });
   }
 
-  const totalPedidos = pedidos.length;
-  const facturado = pedidos.reduce((s,p)=> s + (Number(p.total)||0), 0);
-  const cobrado = pedidos.filter(p=>p.pagado==='Si').reduce((s,p)=> s + (Number(p.total)||0), 0);
+  const pedidosActivos = pedidos.filter(p=>p.cancelado !== "Si");
+  const totalPedidos = pedidosActivos.length;
+  const facturado = pedidosActivos.reduce((s,p)=> s + (Number(p.total)||0), 0);
+  const cobrado = pedidosActivos.filter(p=>p.pagado==='Si').reduce((s,p)=> s + (Number(p.total)||0), 0);
   const pendiente = facturado - cobrado;
 
   $("m_total").textContent = totalPedidos;
@@ -2085,6 +1976,20 @@ function renderAdmin(){
       pedidos[i].pagado = pedidos[i].pagado==='Si' ? 'No' : 'Si';
       await actualizarPedidoRemoto(pedidos[i].id, { pagado: pedidos[i].pagado });
       renderAdmin();
+    });
+  });
+  tbody.querySelectorAll("button.cancelar").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const i = Number(btn.dataset.i);
+      const nuevoEstado = pedidos[i].cancelado==='Si' ? 'No' : 'Si';
+      if(nuevoEstado === 'Si'){
+        const ok = confirm(`¿Marcar el pedido de "${pedidos[i].nombre}" como cancelado?`);
+        if(!ok) return;
+      }
+      pedidos[i].cancelado = nuevoEstado;
+      await actualizarPedidoRemoto(pedidos[i].id, { cancelado: nuevoEstado });
+      renderAdmin();
+      renderCupoStatus();
     });
   });
   tbody.querySelectorAll("button.del").forEach(btn=>{
