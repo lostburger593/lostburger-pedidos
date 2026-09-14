@@ -351,6 +351,20 @@
   </div>
 </div>
 
+<div id="ubicarZonaOverlay" class="hidden">
+  <div class="box">
+    <h3>Ubicar zona: <span id="uz_nombreZona"></span></h3>
+    <div class="map-frame">
+      <div id="mapUbicarZona" style="height:220px;"></div>
+      <p class="map-hint">Arrastra el pin o toca el mapa hasta el centro de esta zona.</p>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="ghost" id="btnCancelarUbicarZona" style="flex:1;">Cancelar</button>
+      <button class="primary" id="btnGuardarUbicacionZona" style="margin-top:0;flex:1;">Guardar ubicación</button>
+    </div>
+  </div>
+</div>
+
 <div id="editOverlay" class="hidden">
   <div class="box">
     <h3>Editar pedido</h3>
@@ -449,6 +463,10 @@
         <div class="cupo-status" id="cupoStatus">Cargando…</div>
         <button class="ghost" id="btnNuevaApertura" style="margin-left:auto;">Nueva apertura (reiniciar contador)</button>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);margin-top:12px;cursor:pointer;">
+        <input type="checkbox" id="chkSoloAperturaActual" checked style="width:auto;">
+        Mostrar solo los pedidos de esta apertura (desmarca para ver el historial completo)
+      </label>
     </div>
   </div>
 
@@ -559,7 +577,10 @@
           <input type="text" id="nz_tiempo" placeholder="Ej: 20-30 min">
         </div>
       </div>
-      <button class="ghost" id="btnAgregarZona" style="margin-top:10px;">Agregar zona</button>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="ghost" id="btnUbicarZonaNueva">📍 Ubicar en mapa (opcional)</button>
+        <button class="ghost" id="btnAgregarZona">Agregar zona</button>
+      </div>
     </div>
   </div>
 
@@ -708,6 +729,11 @@ let PRODUCTOS = PRODUCTOS_DEFAULT.slice();
 let mapClientObj = null;
 let enviandoPedido = false;
 let carritoCliente = [];
+let mostrarSoloAperturaActual = true;
+function obtenerPedidosVisibles(){
+  if(!mostrarSoloAperturaActual || !cupoConfig.apertura) return pedidos;
+  return pedidos.filter(p => p.fecha && p.fecha >= cupoConfig.apertura);
+}
 
 const $ = (id) => document.getElementById(id);
 const money = (n) => "$" + Number(n || 0).toFixed(2);
@@ -740,6 +766,7 @@ function poblarZonas(selZona, ciudad, placeholder){
   ZONAS[ciudad].forEach(z=>{
     const opt=document.createElement("option");
     opt.value=z.zona; opt.dataset.tarifa=z.tarifa; opt.dataset.tiempo=z.tiempo;
+    if(z.lat && z.lng){ opt.dataset.lat=z.lat; opt.dataset.lng=z.lng; }
     opt.textContent=z.zona;
     selZona.appendChild(opt);
   });
@@ -786,10 +813,16 @@ $("c_zona").addEventListener("change", async ()=>{
     info.textContent = `Costo de envío: ${money(opt.dataset.tarifa)} — tiempo estimado: ${opt.dataset.tiempo}`;
     info.classList.add("show");
     const ciudad = $("c_ciudad").value, zona = opt.value;
-    const ok = await geocodeAndCenter(`${zona}, ${ciudad}, Ecuador`, mapClientObj);
-    if(!ok && CITY_CENTERS[ciudad]){
-      mapClientObj.map.setView(CITY_CENTERS[ciudad], 13);
-      mapClientObj.marker.setLatLng(CITY_CENTERS[ciudad]);
+    if(opt.dataset.lat && opt.dataset.lng){
+      const lat = Number(opt.dataset.lat), lng = Number(opt.dataset.lng);
+      mapClientObj.map.setView([lat,lng], 17);
+      mapClientObj.marker.setLatLng([lat,lng]);
+    } else {
+      const ok = await geocodeAndCenter(`${zona}, ${ciudad}, Ecuador`, mapClientObj);
+      if(!ok && CITY_CENTERS[ciudad]){
+        mapClientObj.map.setView(CITY_CENTERS[ciudad], 13);
+        mapClientObj.marker.setLatLng(CITY_CENTERS[ciudad]);
+      }
     }
   } else {
     info.classList.remove("show");
@@ -1130,10 +1163,16 @@ $("e_zona").addEventListener("change", async ()=>{
   const opt = $("e_zona").selectedOptions[0];
   if(opt && opt.dataset.tarifa && mapEditObj){
     const ciudad = $("e_ciudad").value, zona = opt.value;
-    const ok = await geocodeAndCenter(`${zona}, ${ciudad}, Ecuador`, mapEditObj);
-    if(!ok && CITY_CENTERS[ciudad]){
-      mapEditObj.map.setView(CITY_CENTERS[ciudad], 13);
-      mapEditObj.marker.setLatLng(CITY_CENTERS[ciudad]);
+    if(opt.dataset.lat && opt.dataset.lng){
+      const lat = Number(opt.dataset.lat), lng = Number(opt.dataset.lng);
+      mapEditObj.map.setView([lat,lng], 17);
+      mapEditObj.marker.setLatLng([lat,lng]);
+    } else {
+      const ok = await geocodeAndCenter(`${zona}, ${ciudad}, Ecuador`, mapEditObj);
+      if(!ok && CITY_CENTERS[ciudad]){
+        mapEditObj.map.setView(CITY_CENTERS[ciudad], 13);
+        mapEditObj.marker.setLatLng(CITY_CENTERS[ciudad]);
+      }
     }
   }
 });
@@ -1276,6 +1315,11 @@ $("btnNuevaApertura").addEventListener("click", async ()=>{
   cupoConfig.apertura = ahora;
   await reiniciarAperturaRemoto(ahora);
   renderCupoStatus();
+  renderAdmin();
+});
+$("chkSoloAperturaActual").addEventListener("change", ()=>{
+  mostrarSoloAperturaActual = $("chkSoloAperturaActual").checked;
+  renderAdmin();
 });
 function renderCupoStatus(){
   $("s_cupo").value = cupoConfig.cupo;
@@ -1457,9 +1501,65 @@ $("btnAgregarCarritoEdit").addEventListener("click", ()=>{
 });
 
 /* ================= Zonas de entrega: poblar/renderizar/gestionar ================= */
-function agregarZonaRemoto(ciudad, zona, tarifa, tiempo){ return postRemoto({ accion:"zona_nueva", ciudad, zona, tarifa, tiempo }); }
-function actualizarZonaRemoto(ciudad, zona, tarifa, tiempo){ return postRemoto({ accion:"zona_actualizar", ciudad, zona, tarifa, tiempo }); }
+function agregarZonaRemoto(ciudad, zona, tarifa, tiempo, lat, lng){ return postRemoto({ accion:"zona_nueva", ciudad, zona, tarifa, tiempo, lat, lng }); }
+function actualizarZonaRemoto(ciudad, zona, tarifa, tiempo, lat, lng){ return postRemoto({ accion:"zona_actualizar", ciudad, zona, tarifa, tiempo, lat, lng }); }
 function eliminarZonaRemoto(ciudad, zona){ return postRemoto({ accion:"zona_eliminar", ciudad, zona }); }
+
+/* ================= Ubicar zona en el mapa ================= */
+let mapUbicarZonaObj = null;
+let ubicarZonaModo = null; // "existente" | "nueva"
+let ubicarZonaInfo = null; // { ciudad, zona } cuando modo === "existente"
+let nzLatTemp = null, nzLngTemp = null; // coordenadas elegidas para una zona nueva aún no guardada
+
+function initMapUbicarZona(lat, lng, ciudad){
+  if(mapUbicarZonaObj){ mapUbicarZonaObj.map.remove(); mapUbicarZonaObj = null; }
+  setTimeout(()=>{
+    const tieneCoords = lat && lng;
+    const center = tieneCoords ? [Number(lat), Number(lng)] : (CITY_CENTERS[ciudad] || CITY_CENTERS['Guayaquil']);
+    const map = L.map('mapUbicarZona').setView(center, tieneCoords ? 16 : 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
+    }).addTo(map);
+    const marker = L.marker(center, {draggable:true}).addTo(map);
+    map.on("click", (e)=> marker.setLatLng(e.latlng));
+    mapUbicarZonaObj = { map, marker };
+  }, 100);
+}
+function abrirUbicarZonaExistente(ciudad, zonaObj){
+  ubicarZonaModo = "existente";
+  ubicarZonaInfo = { ciudad, zona: zonaObj.zona };
+  $("uz_nombreZona").textContent = `${zonaObj.zona} (${ciudad})`;
+  $("ubicarZonaOverlay").classList.remove("hidden");
+  initMapUbicarZona(zonaObj.lat, zonaObj.lng, ciudad);
+}
+$("btnUbicarZonaNueva").addEventListener("click", ()=>{
+  const ciudad = $("nz_ciudad").value;
+  const nombre = $("nz_nombre").value.trim() || "(nueva zona)";
+  ubicarZonaModo = "nueva";
+  ubicarZonaInfo = null;
+  $("uz_nombreZona").textContent = `${nombre} (${ciudad})`;
+  $("ubicarZonaOverlay").classList.remove("hidden");
+  initMapUbicarZona(nzLatTemp, nzLngTemp, ciudad);
+});
+$("btnCancelarUbicarZona").addEventListener("click", ()=>{
+  $("ubicarZonaOverlay").classList.add("hidden");
+});
+$("btnGuardarUbicacionZona").addEventListener("click", async ()=>{
+  if(!mapUbicarZonaObj) return;
+  const ll = mapUbicarZonaObj.marker.getLatLng();
+  if(ubicarZonaModo === "nueva"){
+    nzLatTemp = ll.lat; nzLngTemp = ll.lng;
+    $("btnUbicarZonaNueva").textContent = "📍 Ubicación lista ✓";
+    $("ubicarZonaOverlay").classList.add("hidden");
+  } else if(ubicarZonaModo === "existente"){
+    const { ciudad, zona } = ubicarZonaInfo;
+    const zonaObj = ZONAS[ciudad].find(z=>z.zona===zona);
+    if(zonaObj){ zonaObj.lat = ll.lat; zonaObj.lng = ll.lng; }
+    await actualizarZonaRemoto(ciudad, zona, zonaObj.tarifa, zonaObj.tiempo, ll.lat, ll.lng);
+    $("ubicarZonaOverlay").classList.add("hidden");
+    renderListaZonas($("buscarZona").value);
+  }
+});
 
 function renderListaZonas(filtro){
   filtro = (filtro || "").toLowerCase().trim();
@@ -1482,19 +1582,23 @@ function renderListaZonas(filtro){
       const fila = document.createElement("div");
       fila.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px;";
       fila.innerHTML = `
-        <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(z.zona)}</span>
+        <span style="flex:1;font-size:13px;color:var(--ink);">${escapeHtml(z.zona)} ${(z.lat&&z.lng)?'📍':''}</span>
         <input type="number" min="0" step="0.01" value="${z.tarifa}" class="tarifa-zona-input" style="width:70px;border:1px solid var(--line);border-radius:6px;padding:5px 7px;background:var(--field-bg);color:var(--field-text);font-size:12.5px;">
         <input type="text" value="${escapeHtml(z.tiempo)}" class="tiempo-zona-input" style="width:90px;border:1px solid var(--line);border-radius:6px;padding:5px 7px;background:var(--field-bg);color:var(--field-text);font-size:12.5px;">
+        <button class="ghost btn-ubicar-zona" style="font-size:11px;">Ubicar</button>
         <button class="ghost btn-eliminar-zona" style="font-size:11px;">Eliminar</button>
       `;
       const guardarCambios = async ()=>{
         const nuevaTarifa = parseFloat(fila.querySelector(".tarifa-zona-input").value) || 0;
         const nuevoTiempo = fila.querySelector(".tiempo-zona-input").value.trim();
         z.tarifa = nuevaTarifa; z.tiempo = nuevoTiempo;
-        await actualizarZonaRemoto(ciudad, z.zona, nuevaTarifa, nuevoTiempo);
+        await actualizarZonaRemoto(ciudad, z.zona, nuevaTarifa, nuevoTiempo, z.lat, z.lng);
       };
       fila.querySelector(".tarifa-zona-input").addEventListener("change", guardarCambios);
       fila.querySelector(".tiempo-zona-input").addEventListener("change", guardarCambios);
+      fila.querySelector(".btn-ubicar-zona").addEventListener("click", ()=>{
+        abrirUbicarZonaExistente(ciudad, z);
+      });
       fila.querySelector(".btn-eliminar-zona").addEventListener("click", async ()=>{
         const ok = confirm(`¿Eliminar la zona "${z.zona}" (${ciudad})?`);
         if(!ok) return;
@@ -1525,8 +1629,10 @@ $("btnAgregarZona").addEventListener("click", async ()=>{
     alert("Ya existe una zona con ese nombre en esa ciudad.");
     return;
   }
-  ZONAS[ciudad].push({ zona, tarifa, tiempo });
-  await agregarZonaRemoto(ciudad, zona, tarifa, tiempo);
+  ZONAS[ciudad].push({ zona, tarifa, tiempo, lat: nzLatTemp, lng: nzLngTemp });
+  await agregarZonaRemoto(ciudad, zona, tarifa, tiempo, nzLatTemp, nzLngTemp);
+  nzLatTemp = null; nzLngTemp = null;
+  $("btnUbicarZonaNueva").textContent = "📍 Ubicar en mapa (opcional)";
   renderListaZonas($("buscarZona").value);
   $("nz_nombre").value = ""; $("nz_tarifa").value = ""; $("nz_tiempo").value = "";
 });
@@ -1797,8 +1903,9 @@ $("btnActualizar").addEventListener("click", async ()=>{
   }
 });
 $("btnDescargarExcel").addEventListener("click", ()=>{
-  if(!pedidos.length){ return; }
-  const filas = pedidos.map(p=>{
+  const pedidosExportar = obtenerPedidosVisibles();
+  if(!pedidosExportar.length){ return; }
+  const filas = pedidosExportar.map(p=>{
     return {
       "Fecha": p.fecha ? new Date(p.fecha).toLocaleString() : "",
       "Nombre": p.nombre,
@@ -1834,11 +1941,11 @@ function enlaceMapaPedido(p){
   return `<a class="maps-link" href="${escapeHtml(p.mapsLink)}" target="_blank" rel="noopener">Ver mapa ↗</a>`;
 }
 
-function calcularCantidadesPorProducto(){
+function calcularCantidadesPorProducto(listaPedidos){
   const cantidades = {};
   PRODUCTOS.forEach(p => cantidades[p.nombre] = 0);
 
-  pedidos.filter(p=>p.cancelado !== "Si").forEach(p=>{
+  (listaPedidos || pedidos).filter(p=>p.cancelado !== "Si").forEach(p=>{
     let items = [];
     if(p.items){
       try{ items = JSON.parse(p.items); }catch(e){ items = []; }
@@ -1853,8 +1960,8 @@ function calcularCantidadesPorProducto(){
   });
   return cantidades;
 }
-function renderCantidadesPorProducto(){
-  const cantidades = calcularCantidadesPorProducto();
+function renderCantidadesPorProducto(listaPedidos){
+  const cantidades = calcularCantidadesPorProducto(listaPedidos);
   const cont = $("listaCantidadesProductos");
   const nombres = Object.keys(cantidades);
   if(!nombres.length){
@@ -1869,9 +1976,9 @@ function renderCantidadesPorProducto(){
   `).join("");
 }
 
-function calcularTotalesPorCategoria(){
+function calcularTotalesPorCategoria(listaPedidos){
   let totalCombo = 0, totalExtra = 0, totalDelivery = 0;
-  pedidos.filter(p=>p.cancelado !== "Si").forEach(p=>{
+  (listaPedidos || pedidos).filter(p=>p.cancelado !== "Si").forEach(p=>{
     totalDelivery += (p.envio === "Si") ? (Number(p.costoEnvio) || 0) : 0;
 
     let items = [];
@@ -1901,14 +2008,19 @@ function renderAdmin(){
   const tbody = $("tbody");
   tbody.innerHTML = "";
 
-  if(pedidos.length===0){
+  const todosConIndice = pedidos.map((p,i)=>({...p, _i:i}));
+  const visibles = (mostrarSoloAperturaActual && cupoConfig.apertura)
+    ? todosConIndice.filter(p => p.fecha && p.fecha >= cupoConfig.apertura)
+    : todosConIndice;
+
+  if(visibles.length===0){
     $("tableScroll").classList.add("hidden");
     $("emptyState").classList.remove("hidden");
   }else{
     $("tableScroll").classList.remove("hidden");
     $("emptyState").classList.add("hidden");
 
-    const ordenados = pedidos.map((p,i)=>({...p, _i:i})).sort((a,b)=> new Date(b.fecha)-new Date(a.fecha));
+    const ordenados = visibles.slice().sort((a,b)=> new Date(b.fecha)-new Date(a.fecha));
 
     ordenados.forEach(p=>{
       const i = p._i;
@@ -1943,7 +2055,7 @@ function renderAdmin(){
     });
   }
 
-  const pedidosActivos = pedidos.filter(p=>p.cancelado !== "Si");
+  const pedidosActivos = visibles.filter(p=>p.cancelado !== "Si");
   const totalPedidos = pedidosActivos.length;
   const facturado = pedidosActivos.reduce((s,p)=> s + (Number(p.total)||0), 0);
   const cobrado = pedidosActivos.filter(p=>p.pagado==='Si').reduce((s,p)=> s + (Number(p.total)||0), 0);
@@ -1954,11 +2066,11 @@ function renderAdmin(){
   $("m_cobrado").textContent = money(cobrado);
   $("m_pendiente").textContent = money(pendiente);
 
-  const totalesCategoria = calcularTotalesPorCategoria();
+  const totalesCategoria = calcularTotalesPorCategoria(visibles);
   $("m_totalCombo").textContent = money(totalesCategoria.totalCombo);
   $("m_totalExtra").textContent = money(totalesCategoria.totalExtra);
   $("m_totalDelivery").textContent = money(totalesCategoria.totalDelivery);
-  renderCantidadesPorProducto();
+  renderCantidadesPorProducto(visibles);
 
   tbody.querySelectorAll("button.editar").forEach(btn=>{
     btn.addEventListener("click", ()=>{
