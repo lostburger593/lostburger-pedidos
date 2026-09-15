@@ -322,6 +322,28 @@
     <button class="primary" id="btnEnviarCliente">Enviar pedido</button>
   </div>
 
+  <div class="card confirm hidden" id="comprobanteCard">
+    <h2 style="text-align:left;">Un último paso — tu comprobante 📎</h2>
+    <p style="text-align:left;white-space:pre-line;" id="comprobanteMensaje"></p>
+    <button type="button" id="btnNoEsMiPedido" class="ghost hidden" style="width:100%;margin-bottom:14px;">¿No es tu pedido? Empezar de nuevo</button>
+    <div class="field full" style="text-align:left;">
+      <label for="c_comprobante">Sube una foto o captura de tu transferencia</label>
+      <input type="file" id="c_comprobante" accept="image/*" capture="environment">
+    </div>
+    <div id="comprobantePreviewWrap" class="hidden" style="margin:10px 0;">
+      <img id="comprobantePreview" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line);">
+    </div>
+    <div id="comprobanteError" style="color:var(--danger);font-size:12.5px;text-align:left;"></div>
+    <div id="comprobanteEmergencia" class="hidden" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);text-align:left;">
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;">
+        ¿No se pudo subir? Envíalo directo por WhatsApp y continúa de todas formas.
+      </p>
+      <a id="linkWhatsappEmergencia" href="#" target="_blank" rel="noopener" class="ghost" style="display:block;text-align:center;text-decoration:none;padding:10px;border-radius:8px;border:1px solid var(--line);margin-bottom:8px;color:var(--ink-soft);">📱 Enviar comprobante por WhatsApp</a>
+      <button class="ghost" id="btnContinuarSinComprobante" style="width:100%;">Ya lo envié por WhatsApp — Continuar</button>
+    </div>
+    <button class="primary" id="btnContinuarComprobante" style="margin-top:14px;" disabled>Continuar</button>
+  </div>
+
   <div class="card confirm hidden" id="confirmCard">
     <div class="check">✓</div>
     <h2 id="confirmTitulo">¡Pedido recibido!</h2>
@@ -467,6 +489,33 @@
         <input type="checkbox" id="chkSoloAperturaActual" checked style="width:auto;">
         Mostrar solo los pedidos de esta apertura (desmarca para ver el historial completo)
       </label>
+    </div>
+  </div>
+
+  <div class="card" id="notificacionesCard" style="margin-bottom:18px;padding:0;">
+    <h2>Notificaciones de pedidos nuevos</h2>
+    <div style="padding:18px 22px;">
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;">
+        Cada vez que entre un pedido nuevo, se te enviará un correo a esta dirección
+        (si tienes la app de Gmail en tu celular, te llega como notificación).
+      </p>
+      <div style="display:flex;gap:8px;">
+        <input type="email" id="s_correoNotificaciones" placeholder="tucorreo@gmail.com" style="flex:1;">
+        <button class="ghost" id="btnGuardarCorreoNotificaciones">Guardar</button>
+      </div>
+      <span id="correoNotificacionesTexto" style="font-size:12.5px;color:var(--ink-soft);"></span>
+
+      <hr style="border:none;border-top:1px solid var(--line);margin:18px 0;">
+
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;">
+        Este es el WhatsApp donde el cliente te puede enviar el comprobante manualmente,
+        si por algún error no logra subirlo desde la página.
+      </p>
+      <div style="display:flex;gap:8px;">
+        <input type="tel" id="s_whatsappNegocio" placeholder="09XXXXXXXX" style="flex:1;">
+        <button class="ghost" id="btnGuardarWhatsappNegocio">Guardar</button>
+      </div>
+      <span id="whatsappNegocioTexto" style="font-size:12.5px;color:var(--ink-soft);"></span>
     </div>
   </div>
 
@@ -685,6 +734,7 @@
             <th>Pagado</th>
             <th>Referencias</th>
             <th>Mapa</th>
+            <th>Comprobante</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -724,11 +774,13 @@ Apenas tengamos tu comprobante, ¡tu pedido queda asegurado para la próxima ape
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr4hWzm9NeHIs6h56cn2nkpkbC0KVrNnkgI_uTaksQP74EtYNsOu70mn3aJB7PMVum/exec";
 
 let pedidos = [];
-let cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null, plantillaMensaje: PLANTILLA_MENSAJE_DEFAULT };
+let cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null, plantillaMensaje: PLANTILLA_MENSAJE_DEFAULT, correoNotificaciones: "", whatsappNegocio: "" };
 let PRODUCTOS = PRODUCTOS_DEFAULT.slice();
 let mapClientObj = null;
 let enviandoPedido = false;
 let carritoCliente = [];
+let pedidoRecienCreado = null;
+let comprobanteBlob = null;
 let mostrarSoloAperturaActual = true;
 function obtenerPedidosVisibles(){
   if(!mostrarSoloAperturaActual || !cupoConfig.apertura) return pedidos;
@@ -738,6 +790,144 @@ function obtenerPedidosVisibles(){
 const $ = (id) => document.getElementById(id);
 const money = (n) => "$" + Number(n || 0).toFixed(2);
 function escapeHtml(str){ const d=document.createElement("div"); d.textContent=str??""; return d.innerHTML; }
+/* ================= Comprobante de transferencia ================= */
+function comprimirImagen(archivo, maxAncho, calidad){
+  maxAncho = maxAncho || 1000;
+  calidad = calidad || 0.7;
+  return new Promise((resolve)=>{
+    const lector = new FileReader();
+    lector.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const ratio = Math.min(1, maxAncho / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob)=> resolve(blob || archivo), "image/jpeg", calidad);
+      };
+      img.onerror = ()=> resolve(archivo);
+      img.src = e.target.result;
+    };
+    lector.onerror = ()=> resolve(archivo);
+    lector.readAsDataURL(archivo);
+  });
+}
+/* ================= Recordar pedido pendiente de comprobante (por si el navegador se reinicia) ================= */
+const CLAVE_PEDIDO_PENDIENTE = "lostburger_pedido_pendiente";
+const HORAS_VALIDEZ_PEDIDO_PENDIENTE = 6;
+
+function guardarPedidoPendienteLocal(pedido){
+  try{ localStorage.setItem(CLAVE_PEDIDO_PENDIENTE, JSON.stringify(pedido)); }catch(e){}
+}
+function borrarPedidoPendienteLocal(){
+  try{ localStorage.removeItem(CLAVE_PEDIDO_PENDIENTE); }catch(e){}
+}
+function leerPedidoPendienteLocal(){
+  try{
+    const raw = localStorage.getItem(CLAVE_PEDIDO_PENDIENTE);
+    if(!raw) return null;
+    const pedido = JSON.parse(raw);
+    const horas = (Date.now() - new Date(pedido.fecha).getTime()) / (1000*60*60);
+    if(horas > HORAS_VALIDEZ_PEDIDO_PENDIENTE){ borrarPedidoPendienteLocal(); return null; }
+    return pedido;
+  }catch(e){ return null; }
+}
+
+function mostrarPasoComprobante(pedido){
+  const plantilla = cupoConfig.plantillaMensaje || PLANTILLA_MENSAJE_DEFAULT;
+  const monto = (Number(pedido.total)||0).toFixed(2);
+  const mensaje = plantilla
+    .split("{nombre}").join(pedido.nombre || "")
+    .split("{detalle}").join(pedido.detalle || "")
+    .split("{monto}").join(monto);
+  $("comprobanteMensaje").textContent = mensaje;
+  $("comprobanteError").textContent = "";
+  $("comprobanteEmergencia").classList.add("hidden");
+  $("btnNoEsMiPedido").classList.add("hidden");
+  $("comprobantePreviewWrap").classList.add("hidden");
+  $("c_comprobante").value = "";
+  comprobanteBlob = null;
+  $("btnContinuarComprobante").disabled = true;
+  $("btnContinuarComprobante").textContent = "Continuar";
+  $("comprobanteCard").classList.remove("hidden");
+}
+async function subirComprobanteRemoto(pedidoId, blob){
+  return new Promise((resolve)=>{
+    const lector = new FileReader();
+    lector.onload = async ()=>{
+      try{
+        const base64 = lector.result.split(",")[1];
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ accion:"subir_comprobante", id: pedidoId, imagenBase64: base64 })
+        });
+        const data = await res.json();
+        resolve(!!(data && data.ok));
+      }catch(e){
+        console.error("Error subiendo comprobante:", e);
+        resolve(false);
+      }
+    };
+    lector.onerror = ()=> resolve(false);
+    lector.readAsDataURL(blob);
+  });
+}
+$("c_comprobante").addEventListener("change", async ()=>{
+  const archivo = $("c_comprobante").files[0];
+  $("comprobanteError").textContent = "";
+  if(!archivo){
+    $("btnContinuarComprobante").disabled = true;
+    $("comprobantePreviewWrap").classList.add("hidden");
+    return;
+  }
+  $("btnContinuarComprobante").disabled = true;
+  comprobanteBlob = await comprimirImagen(archivo);
+  const urlPreview = URL.createObjectURL(comprobanteBlob);
+  $("comprobantePreview").src = urlPreview;
+  $("comprobantePreviewWrap").classList.remove("hidden");
+  $("btnContinuarComprobante").disabled = false;
+});
+$("btnContinuarComprobante").addEventListener("click", async ()=>{
+  if(!comprobanteBlob || !pedidoRecienCreado) return;
+  const btn = $("btnContinuarComprobante");
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Subiendo…";
+  $("comprobanteError").textContent = "";
+
+  const ok = await subirComprobanteRemoto(pedidoRecienCreado.id, comprobanteBlob);
+  if(!ok){
+    $("comprobanteError").textContent = "No se pudo subir el comprobante. Revisa tu conexión e intenta de nuevo, o usa la opción de WhatsApp de abajo.";
+    if(cupoConfig.whatsappNegocio){
+      const p = pedidoRecienCreado;
+      const monto = (Number(p.total)||0).toFixed(2);
+      const texto = encodeURIComponent(`Hola! Te envío el comprobante de mi pedido (${p.detalle}) por $${monto}.`);
+      $("linkWhatsappEmergencia").href = `${waLink(cupoConfig.whatsappNegocio)}?text=${texto}`;
+      $("comprobanteEmergencia").classList.remove("hidden");
+    }
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+    return;
+  }
+
+  $("comprobanteCard").classList.add("hidden");
+  $("confirmCard").classList.remove("hidden");
+  borrarPedidoPendienteLocal();
+  btn.disabled = false;
+  btn.textContent = textoOriginal;
+});
+$("btnContinuarSinComprobante").addEventListener("click", async ()=>{
+  if(!pedidoRecienCreado) return;
+  await actualizarPedidoRemoto(pedidoRecienCreado.id, { comprobante: "Enviado por WhatsApp (no se pudo subir desde la página)" });
+  $("comprobanteEmergencia").classList.add("hidden");
+  $("comprobanteCard").classList.add("hidden");
+  $("confirmCard").classList.remove("hidden");
+  borrarPedidoPendienteLocal();
+});
+
 function waLink(numero){
   let digits = String(numero||"").replace(/\D/g,"");
   if(!digits) return "";
@@ -941,8 +1131,10 @@ $("btnEnviarCliente").addEventListener("click", async ()=>{
       ${esEnvio ? `<div><span>Costo envío</span><span>${money(costoEnvio)} (${tiempoEstimado})</span></div>` : ""}
       <div><span><strong>Total</strong></span><span><strong>${money(total)}</strong></span></div>
     `;
+    pedidoRecienCreado = pedido;
+    guardarPedidoPendienteLocal(pedido);
+    mostrarPasoComprobante(pedido);
     $("formCliente").classList.add("hidden");
-    $("confirmCard").classList.remove("hidden");
   } finally {
     enviandoPedido = false;
     btnEnviar.disabled = false;
@@ -966,12 +1158,17 @@ $("btnOtroPedido").addEventListener("click", async ()=>{
   setEntregaCliente(true);
   $("errorMsg").textContent = "";
   $("confirmCard").classList.add("hidden");
+  $("comprobanteCard").classList.add("hidden");
+  pedidoRecienCreado = null;
+  comprobanteBlob = null;
+  borrarPedidoPendienteLocal();
   await refrescarEstadoCliente();
 });
 
 function mostrarCerrado(titulo, texto){
   $("formCliente").classList.add("hidden");
   $("confirmCard").classList.add("hidden");
+  $("comprobanteCard").classList.add("hidden");
   $("closedTitulo").textContent = titulo;
   $("closedTexto").textContent = texto;
   $("closedCard").classList.remove("hidden");
@@ -1070,6 +1267,30 @@ function renderUbicacionLocalTexto(){
 function renderPlantillaMensaje(){
   $("s_plantillaMensaje").value = cupoConfig.plantillaMensaje || PLANTILLA_MENSAJE_DEFAULT;
 }
+function renderCorreoNotificaciones(){
+  $("s_correoNotificaciones").value = cupoConfig.correoNotificaciones || "";
+  $("correoNotificacionesTexto").textContent = cupoConfig.correoNotificaciones
+    ? "Activas ✓"
+    : "Aún no has guardado un correo — no se enviarán notificaciones.";
+}
+function renderWhatsappNegocio(){
+  $("s_whatsappNegocio").value = cupoConfig.whatsappNegocio || "";
+  $("whatsappNegocioTexto").textContent = cupoConfig.whatsappNegocio
+    ? "Guardado ✓"
+    : "Aún no lo has guardado — el botón de emergencia por WhatsApp no aparecerá.";
+}
+$("btnGuardarWhatsappNegocio").addEventListener("click", async ()=>{
+  const numero = $("s_whatsappNegocio").value.trim();
+  cupoConfig.whatsappNegocio = numero;
+  await guardarWhatsappNegocioRemoto(numero);
+  renderWhatsappNegocio();
+});
+$("btnGuardarCorreoNotificaciones").addEventListener("click", async ()=>{
+  const correo = $("s_correoNotificaciones").value.trim();
+  cupoConfig.correoNotificaciones = correo;
+  await guardarCorreoNotificacionesRemoto(correo);
+  renderCorreoNotificaciones();
+});
 $("btnGuardarPlantilla").addEventListener("click", async ()=>{
   const texto = $("s_plantillaMensaje").value;
   cupoConfig.plantillaMensaje = texto;
@@ -1788,7 +2009,7 @@ function storageDisponible(){
 async function loadData(){
   if(!storageDisponible()){
     pedidos = [];
-    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null, plantillaMensaje: PLANTILLA_MENSAJE_DEFAULT };
+    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null, plantillaMensaje: PLANTILLA_MENSAJE_DEFAULT, correoNotificaciones: "", whatsappNegocio: "" };
     PRODUCTOS = PRODUCTOS_DEFAULT.slice();
     return;
   }
@@ -1807,7 +2028,9 @@ async function loadData(){
     const latLocal = data.latLocal ? Number(data.latLocal) : null;
     const lngLocal = data.lngLocal ? Number(data.lngLocal) : null;
     const plantillaMensaje = data.plantillaMensaje || PLANTILLA_MENSAJE_DEFAULT;
-    cupoConfig = { cupo, usados, apertura, proximoBatch, cerrado, latLocal, lngLocal, plantillaMensaje };
+    const correoNotificaciones = data.correoNotificaciones || "";
+    const whatsappNegocio = data.whatsappNegocio || "";
+    cupoConfig = { cupo, usados, apertura, proximoBatch, cerrado, latLocal, lngLocal, plantillaMensaje, correoNotificaciones, whatsappNegocio };
     PRODUCTOS = (data.productos && data.productos.length) ? data.productos : PRODUCTOS_DEFAULT.slice();
 
     if(data.zonas && data.zonas.length){
@@ -1823,7 +2046,7 @@ async function loadData(){
   }catch(e){
     console.error("Error al cargar datos:", e);
     pedidos = [];
-    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null, plantillaMensaje: PLANTILLA_MENSAJE_DEFAULT };
+    cupoConfig = { cupo: CUPO_DEFAULT, usados: 0, apertura: "", proximoBatch: "", cerrado: "No", latLocal: null, lngLocal: null, plantillaMensaje: PLANTILLA_MENSAJE_DEFAULT, correoNotificaciones: "", whatsappNegocio: "" };
     PRODUCTOS = PRODUCTOS_DEFAULT.slice();
   }
 }
@@ -1853,6 +2076,8 @@ function guardarProximoBatchRemoto(texto){ return postRemoto({ accion:"proximo_b
 function guardarCerradoRemoto(cerrado){ return postRemoto({ accion:"cerrado", cerrado }); }
 function guardarUbicacionLocalRemoto(lat, lng){ return postRemoto({ accion:"ubicacion_local", lat, lng }); }
 function guardarPlantillaMensajeRemoto(texto){ return postRemoto({ accion:"plantilla_mensaje", texto }); }
+function guardarCorreoNotificacionesRemoto(correo){ return postRemoto({ accion:"correo_notificaciones", correo }); }
+function guardarWhatsappNegocioRemoto(numero){ return postRemoto({ accion:"whatsapp_negocio", numero }); }
 function agregarProductoRemoto(nombre, precio, categoria){ return postRemoto({ accion:"producto_nuevo", nombre, precio, categoria }); }
 function actualizarProductoRemoto(nombre, precio){ return postRemoto({ accion:"producto_actualizar", nombre, precio }); }
 function eliminarProductoRemoto(nombre){ return postRemoto({ accion:"producto_eliminar", nombre }); }
@@ -1876,6 +2101,8 @@ async function loadPedidosAdmin(){
   renderUbicacionLocalTexto();
   renderListaZonas($("buscarZona").value);
   renderPlantillaMensaje();
+  renderCorreoNotificaciones();
+  renderWhatsappNegocio();
   $("loadingNote").classList.add("hidden");
 }
 
@@ -1897,6 +2124,8 @@ $("btnActualizar").addEventListener("click", async ()=>{
     renderUbicacionLocalTexto();
     renderListaZonas($("buscarZona").value);
     renderPlantillaMensaje();
+    renderCorreoNotificaciones();
+    renderWhatsappNegocio();
   } finally {
     btn.disabled = false;
     btn.textContent = textoOriginal;
@@ -1918,9 +2147,11 @@ $("btnDescargarExcel").addEventListener("click", ()=>{
       "Costo envío": p.envio==='Si' ? p.costoEnvio : "",
       "Total": p.total ?? "",
       "Pagado": p.pagado,
+      "Cancelado": p.cancelado === "Si" ? "Si" : "No",
       "Referencias": p.direccion || "",
       "Notas": p.notas || "",
-      "Link Google Maps": p.mapsLink || ""
+      "Link Google Maps": p.mapsLink || "",
+      "Comprobante": p.comprobante || ""
     };
   });
   const ws = XLSX.utils.json_to_sheet(filas);
@@ -2040,6 +2271,7 @@ function renderAdmin(){
         <td><span class="badge ${p.pagado==='Si'?'pagado':'pendiente'}">${p.pagado==='Si'?'Pagado':'Pendiente'}</span></td>
         <td class="dir">${escapeHtml(p.direccion||"")}</td>
         <td>${enlaceMapaPedido(p)}</td>
+        <td>${p.comprobante ? `<a class="maps-link" href="${escapeHtml(p.comprobante)}" target="_blank" rel="noopener">Ver comprobante ↗</a>` : "—"}</td>
         <td>
           <div class="row-actions">
             <button class="editar" data-i="${i}">Editar</button>
@@ -2107,6 +2339,8 @@ function renderAdmin(){
   tbody.querySelectorAll("button.del").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
       const i = Number(btn.dataset.i);
+      const ok = confirm(`¿Eliminar PERMANENTEMENTE el pedido de "${pedidos[i].nombre}"? Esta acción no se puede deshacer.`);
+      if(!ok) return;
       const idBorrar = pedidos[i].id;
       pedidos.splice(i,1);
       await eliminarPedidoRemoto(idBorrar);
@@ -2116,7 +2350,27 @@ function renderAdmin(){
 }
 
 /* ================= Inicio ================= */
-refrescarEstadoCliente();
+(async function iniciarPagina(){
+  const pendiente = leerPedidoPendienteLocal();
+  if(pendiente){
+    await loadData();
+    pedidoRecienCreado = pendiente;
+    $("loadingNoteCliente").classList.add("hidden");
+    mostrarPasoComprobante(pendiente);
+    $("btnNoEsMiPedido").classList.remove("hidden");
+  } else {
+    await refrescarEstadoCliente();
+  }
+})();
+$("btnNoEsMiPedido").addEventListener("click", async ()=>{
+  const ok = confirm("¿Seguro? Vas a descartar el pedido anterior y empezar uno nuevo.");
+  if(!ok) return;
+  borrarPedidoPendienteLocal();
+  pedidoRecienCreado = null;
+  $("comprobanteCard").classList.add("hidden");
+  $("btnNoEsMiPedido").classList.add("hidden");
+  await refrescarEstadoCliente();
+});
 </script>
 </body>
 </html>
