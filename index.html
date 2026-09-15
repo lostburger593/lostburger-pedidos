@@ -287,6 +287,14 @@
         </div>
       </div>
 
+      <div class="field full">
+        <label>Forma de pago</label>
+        <div class="radio-row">
+          <label class="radio-opt active" id="optEfectivo"><input type="radio" name="c_pago" value="Efectivo" checked> Efectivo al recibir</label>
+          <label class="radio-opt" id="optTransferencia"><input type="radio" name="c_pago" value="Transferencia"> Transferencia</label>
+        </div>
+      </div>
+
       <div class="field" id="wrapCiudad">
         <label for="c_ciudad">Ciudad</label>
         <select id="c_ciudad"><option value="">Selecciona…</option></select>
@@ -665,6 +673,13 @@
         </select>
       </div>
       <div class="field">
+        <label for="a_metodopago">Forma de pago</label>
+        <select id="a_metodopago">
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="a_ciudad">Ciudad</label>
         <select id="a_ciudad" disabled><option value="">—</option></select>
       </div>
@@ -728,6 +743,7 @@
             <th class="num">Cant.</th>
             <th class="num">Subtotal</th>
             <th>Envío</th>
+            <th>Pago</th>
             <th>Zona</th>
             <th class="num">Costo envío</th>
             <th class="num">Total</th>
@@ -792,8 +808,8 @@ const money = (n) => "$" + Number(n || 0).toFixed(2);
 function escapeHtml(str){ const d=document.createElement("div"); d.textContent=str??""; return d.innerHTML; }
 /* ================= Comprobante de transferencia ================= */
 function comprimirImagen(archivo, maxAncho, calidad){
-  maxAncho = maxAncho || 1000;
-  calidad = calidad || 0.7;
+  maxAncho = maxAncho || 900;
+  calidad = calidad || 0.6;
   return new Promise((resolve)=>{
     const lector = new FileReader();
     lector.onload = (e)=>{
@@ -897,8 +913,14 @@ $("btnContinuarComprobante").addEventListener("click", async ()=>{
   btn.disabled = true;
   btn.textContent = "Subiendo…";
   $("comprobanteError").textContent = "";
+  $("comprobanteError").style.color = "var(--ink-soft)";
+  const avisoLento = setTimeout(()=>{
+    $("comprobanteError").textContent = "Esto puede tardar unos segundos, no cierres la página…";
+  }, 3000);
 
   const ok = await subirComprobanteRemoto(pedidoRecienCreado.id, comprobanteBlob);
+  clearTimeout(avisoLento);
+  $("comprobanteError").style.color = "var(--danger)";
   if(!ok){
     $("comprobanteError").textContent = "No se pudo subir el comprobante. Revisa tu conexión e intenta de nuevo, o usa la opción de WhatsApp de abajo.";
     if(cupoConfig.whatsappNegocio){
@@ -1032,6 +1054,12 @@ function setEntregaCliente(esEnvio){
 document.querySelectorAll('input[name="c_entrega"]').forEach(r=>{
   r.addEventListener("change", ()=> setEntregaCliente(r.value === "Si"));
 });
+document.querySelectorAll('input[name="c_pago"]').forEach(r=>{
+  r.addEventListener("change", ()=>{
+    $("optEfectivo").classList.toggle("active", r.value === "Efectivo" && r.checked);
+    $("optTransferencia").classList.toggle("active", r.value === "Transferencia" && r.checked);
+  });
+});
 
 $("c_ciudad").addEventListener("change", ()=>{
   poblarZonas($("c_zona"), $("c_ciudad").value, "Primero elige ciudad");
@@ -1052,6 +1080,7 @@ $("btnEnviarCliente").addEventListener("click", async ()=>{
   const zona = $("c_zona").value;
   const direccion = $("c_direccion").value.trim();
   const notas = $("c_notas").value.trim();
+  const metodoPago = document.querySelector('input[name="c_pago"]:checked').value;
 
   $("errorMsg").textContent = "";
   if(!nombre){ $("errorMsg").textContent = "Cuéntanos tu nombre."; return; }
@@ -1103,7 +1132,7 @@ $("btnEnviarCliente").addEventListener("click", async ()=>{
       tiempoEstimado,
       costoEnvio,
       direccion: esEnvio ? (direccion || "Sin referencia") : "Retiro en local",
-      notas,
+      notas, metodoPago,
       mapsLink, lat, lng,
       pagado: "No",
       cancelado: "No",
@@ -1132,9 +1161,13 @@ $("btnEnviarCliente").addEventListener("click", async ()=>{
       <div><span><strong>Total</strong></span><span><strong>${money(total)}</strong></span></div>
     `;
     pedidoRecienCreado = pedido;
-    guardarPedidoPendienteLocal(pedido);
-    mostrarPasoComprobante(pedido);
     $("formCliente").classList.add("hidden");
+    if(metodoPago === "Transferencia"){
+      guardarPedidoPendienteLocal(pedido);
+      mostrarPasoComprobante(pedido);
+    } else {
+      $("confirmCard").classList.remove("hidden");
+    }
   } finally {
     enviandoPedido = false;
     btnEnviar.disabled = false;
@@ -1155,6 +1188,8 @@ $("btnOtroPedido").addEventListener("click", async ()=>{
   $("c_ciudad").value = ""; poblarZonas($("c_zona"), "", "Primero elige ciudad");
   $("zonaInfo").classList.remove("show");
   document.querySelector('input[name="c_entrega"][value="Si"]').checked = true;
+  document.querySelector('input[name="c_pago"][value="Efectivo"]').checked = true;
+  $("optEfectivo").classList.add("active"); $("optTransferencia").classList.remove("active");
   setEntregaCliente(true);
   $("errorMsg").textContent = "";
   $("confirmCard").classList.add("hidden");
@@ -1982,6 +2017,7 @@ $("btnIngresarAdmin").addEventListener("click", async ()=>{
       costoEnvio: envio==="Si"?costoEnvio:0,
       direccion: envio==="Si" ? direccion : "Retiro en local",
       mapsLink: envio==="Si" ? mapsLink : "",
+      metodoPago: $("a_metodopago").value,
       pagado, cancelado: "No", total
     };
     pedidos.push(nuevoPedido);
@@ -1993,7 +2029,7 @@ $("btnIngresarAdmin").addEventListener("click", async ()=>{
     carritoAdmin = [];
     renderCarritoAdmin();
     ["a_nombre","a_telefono","a_direccion","a_maps"].forEach(id=> $(id).value="");
-    $("a_envio").value="No"; $("a_pagado").value="No";
+    $("a_envio").value="No"; $("a_pagado").value="No"; $("a_metodopago").value="Efectivo";
     $("a_envio").dispatchEvent(new Event("change"));
   } finally {
     enviandoAdmin = false;
@@ -2143,6 +2179,7 @@ $("btnDescargarExcel").addEventListener("click", ()=>{
       "Cantidad": p.cantidad,
       "Subtotal": p.subtotal ?? "",
       "Envío": p.envio,
+      "Forma de pago": p.metodoPago || "",
       "Zona": p.envio==='Si' ? `${p.zona} - ${p.ciudad}` : "",
       "Costo envío": p.envio==='Si' ? p.costoEnvio : "",
       "Total": p.total ?? "",
@@ -2265,6 +2302,7 @@ function renderAdmin(){
         <td class="num">${p.cantidad}</td>
         <td class="num">${tieneSubtotal ? money(p.subtotal) : "—"}</td>
         <td><span class="badge ${p.envio==='Si'?'si':'no'}">${p.envio==='Si'?'Sí':'No'}</span></td>
+        <td>${p.metodoPago ? escapeHtml(p.metodoPago) : "—"}</td>
         <td>${p.envio==='Si' ? escapeHtml(p.zona+" · "+p.ciudad) : "—"}</td>
         <td class="num">${p.envio==='Si' ? money(p.costoEnvio) : "—"}</td>
         <td class="num"><strong>${money(p.total || 0)}</strong></td>
